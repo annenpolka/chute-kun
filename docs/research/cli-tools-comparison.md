@@ -61,6 +61,55 @@ func main() {
 }
 ```
 
+**Todoist API連携 (sachaos/todoist):**
+```go
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    todoist "github.com/sachaos/todoist/lib"
+)
+
+func main() {
+    // クライアント初期化
+    config := &todoist.Config{
+        AccessToken: "YOUR_API_TOKEN",
+        DebugMode:   false,
+    }
+    client := todoist.NewClient(config)
+    
+    // データ同期
+    ctx := context.Background()
+    if err := client.Sync(ctx); err != nil {
+        log.Fatal(err)
+    }
+    
+    // タスク一覧取得
+    for _, item := range client.Store.Items {
+        if !item.Checked {
+            fmt.Printf("ID: %s, タスク: %s, 優先度: %d\n", 
+                        item.ID, item.Content, item.Priority)
+        }
+    }
+    
+    // タスク追加
+    newTask := todoist.Item{
+        Content:    "新しいタスク",
+        Priority:   4, // 最高優先度
+        DateString: "today",
+    }
+    if err := client.AddItem(ctx, newTask); err != nil {
+        log.Fatal(err)
+    }
+    
+    // タスク完了
+    if err := client.CloseItem(ctx, []string{"タスクID"}); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
 ### 2. Python
 
 **長所:**
