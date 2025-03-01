@@ -11,6 +11,9 @@ This repository contains documentation and implementation of TaskChute methodolo
 - **Incremental Design**: Evolve design alongside code rather than detailed upfront planning
 - **Continuous Testing**: All features should have automated tests
 - **Context Clarification**: When requirements or context is unclear, always ask the user for clarification before proceeding
+- **Document-Driven Development**: Documentation is an integral part of the development process, not an afterthought
+- **Post-Commit Documentation Hook**: Every code change requires corresponding documentation updates
+- **Disciplined Workflow**: Follow the structured workflow defined in `docs/processes/development-workflow.md`
 
 ### File Organization
 - Maintain clear separation between documentation files and implementation code
@@ -38,23 +41,33 @@ This repository contains documentation and implementation of TaskChute methodolo
 
 ## Documentation Management Requirements
 
-### 1. Architecture Decision Records (ADRs)
+### 1. Document Structure Overview
+- See `docs/README.md` for the complete documentation guide and structure
+- Documentation is organized in logical categories with clear navigation
+- Each document has a specific purpose and target audience
+
+### 2. Architecture Decision Records (ADRs)
 - Create ADRs for all framework selections, design patterns, data model changes, API designs
 - Store in `docs/adr/ADR-{number}-{title}.md`
 - Include status, date, context, decision, rationale, consequences, and related documents
 - Never contradict existing ADRs without updating their status
 
-### 2. System Documentation
+### 3. System Documentation
 - System overview: `docs/system-overview.md` (components, roles, dependencies)
 - Module specifications: `docs/modules/{module-name}.md` (responsibilities, interfaces, dependencies)
 - Data models: `docs/data/models.md` (entity diagrams, schemas, constraints)
 - API specifications: `docs/api/spec.md` (endpoints, request/response formats, error codes)
-- Decision log: `docs/decisions/log.md` (for minor decisions)
+- Feature specifications: `docs/features/{feature-name}.md` (detailed feature requirements)
 
-### 3. Documentation Maintenance Rules
+### 4. Development Process Documentation
+- Development workflow: `docs/processes/development-workflow.md` (document-driven development)
+- Commit strategy: `docs/processes/commit-strategy.md` (commit conventions)
+- Decision log: `docs/processes/decisions-log.md` (for minor decisions)
+
+### 5. Documentation Maintenance Rules
 - Reference relevant documentation before any code changes
 - Maintain consistent terminology across all documents
-- Update documentation simultaneously with code changes
+- Update documentation simultaneously with code changes (documentation as post-commit hook)
 - Resolve contradictions immediately
 - Mark planned features explicitly
 - Include last modified date on all documents
