@@ -162,28 +162,35 @@ export async function getTasks(api: TodoistApi | any, filter?: TaskFilter): Prom
 /**
  * 今日期限のタスクを取得
  * @param api - TodoistApiインスタンス
- * @returns 今日期限のタスク一覧
+ * @returns 今日期限のタスクの配列
  */
 export async function getTodayTasks(api: TodoistApi | any): Promise<TodoistTask[]> {
   try {
-    // 新APIではdueストリングでフィルタできるため、直接取得を試みる
-    const response = await api.getTasks({ filter: 'today' });
-    debug('Using direct today filter');
-    debug('Today tasks response:', response);
+    debug('Getting all tasks first, then filtering for today');
+    const allTasks = await getTasks(api);
+    debug(`Retrieved ${allTasks.length} total tasks`);
 
-    // APIの戻り値を正規化
-    // 配列形式、resultsプロパティ、itemsプロパティのいずれかに対応
-    // Array format: [task1, task2, ...]
-    // Object format: { results: [task1, task2, ...] } or { items: [task1, task2, ...] }
-    const tasks = Array.isArray(response) ? response : (response.results || response.items || []);
+    // 今日の日付を取得（YYYY-MM-DD形式）
+    const today = new Date().toISOString().split('T')[0];
+    debug(`Today's date: ${today}`);
 
-    // 完了済みタスクを除外
-    return tasks.filter((task: any) => !task.isCompleted) as TodoistTask[];
+    // 今日期限のタスク（完了タスクを除く）をフィルタリング
+    const todayTasks = allTasks.filter(task => {
+      // 完了済みのタスクは含めない
+      if (task.isCompleted) return false;
+
+      // より明示的なnullチェック
+      const hasDueDate = typeof task.due === 'object' && task.due !== null && typeof task.due.date === 'string';
+      const isDueToday = hasDueDate && task.due!.date === today;
+
+      return isDueToday;
+    });
+
+    debug(`Found ${todayTasks.length} tasks due today`);
+    return todayTasks;
   } catch (error) {
-    // 直接フィルタが失敗した場合は従来の方法を使用
-    console.log('Fallback to date filtering');
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD形式
-    return getTasks(api, { dueDate: today, isCompleted: false });
+    console.error('今日のタスク取得中にエラーが発生しました:', error);
+    throw error;
   }
 }
 
@@ -279,6 +286,7 @@ export async function getTasksWithSubtasks(
 
 /**
  * 直接APIからサブタスクを取得する関数
+ * 期限に関係なく、指定された親タスクの直下のサブタスクをすべて取得します
  * @param api - TodoistApiインスタンス
  * @param parentId - 親タスクID
  * @returns 親タスクの直下のサブタスク配列
@@ -290,10 +298,10 @@ export async function getSubtasks(
   console.log(`親タスク(ID: ${parentId})のサブタスクを直接APIから取得します...`);
 
   try {
-    // 全タスクを取得
+    // 全タスクを取得（期限でフィルタリングしない）
     const allTasks = await getTasks(api);
 
-    // 親IDに一致するサブタスクをフィルタリング
+    // 親IDに一致するサブタスクをフィルタリング（期限条件なし）
     const subtasks = allTasks.filter(task => {
       // parentId、parent_id、parentのいずれかを使用して親子関係を検出
       const taskParentId = task.parentId || task.parent_id || task.parent;
@@ -309,6 +317,7 @@ export async function getSubtasks(
 
 /**
  * 再帰的にサブタスクを取得して階層構造を構築する関数
+ * 期限に関係なく、指定された親タスクのすべてのサブタスクを取得します
  * @param api - TodoistApiインスタンス
  * @param parentId - 親タスクID
  * @param level - 階層レベル（再帰呼び出し用）
@@ -322,7 +331,7 @@ export async function getSubtasksRecursive(
   console.log(`階層レベル ${level} - 親タスク(ID: ${parentId})のサブタスクを再帰的に取得します...`);
 
   try {
-    // 直接のサブタスクを取得
+    // 直接のサブタスクを取得 (期限に関係なくすべて取得)
     const directSubtasks = await getSubtasks(api, parentId);
 
     // 階層構造を構築
@@ -387,6 +396,7 @@ export function collectAllSubtaskIds(
 
 /**
  * 今日期限のタスクとそのサブタスク（期限問わず）を取得
+ * サブタスクは期限に関係なく全て取得します
  * @param api - TodoistApiインスタンス
  * @returns 階層構造化された今日期限のタスクとそのサブタスクの配列
  */
@@ -395,39 +405,79 @@ export async function getTodayTasksWithSubtasks(
 ): Promise<HierarchicalTask[]> {
   try {
     // まず全タスクを取得
+    debug('Getting all tasks for today with subtasks');
     const allTasks = await getTasks(api);
+    debug(`Retrieved ${allTasks.length} total tasks`);
 
-    // 今日期限のタスクを取得
-    const todayTasks = await getTodayTasks(api);
+    // 今日の日付を取得（YYYY-MM-DD形式）
+    const today = new Date().toISOString().split('T')[0];
+    debug(`Today's date: ${today}`);
 
-    // 今日期限のタスクがない場合は空配列を返す
-    if (todayTasks.length === 0) {
+    // 今日期限の親タスクIDを抽出
+    const todayTaskIds = allTasks
+      .filter(task => {
+        // 親タスク（サブタスクではない）で、完了していなくて、今日が期限のもの
+        const isParentTask = !(task.parentId || task.parent_id || task.parent);
+        // より明示的なnullチェック
+        const hasDueDate = typeof task.due === 'object' && task.due !== null && typeof task.due.date === 'string';
+        const isDueToday = hasDueDate && task.due!.date === today;
+        const isNotCompleted = !task.isCompleted;
+
+        return isParentTask && isDueToday && isNotCompleted;
+      })
+      .map(task => task.id);
+
+    debug(`Found ${todayTaskIds.length} parent tasks due today`);
+
+    if (todayTaskIds.length === 0) {
+      debug('No tasks due today, returning empty array');
       return [];
     }
 
-    // 階層構造を持つタスク配列
-    const hierarchicalTasks: HierarchicalTask[] = [];
+    // 今日期限のタスクとそのサブタスクを含むリストを作成
+    const tasksToProcess = allTasks.filter(task => {
+      // 今日期限の親タスク自体を含める
+      if (todayTaskIds.includes(task.id)) return true;
 
-    // 今日期限の各タスクを処理
-    for (const todayTask of todayTasks) {
-      // 親タスクの階層構造を作成
-      const hierarchicalTask: HierarchicalTask = {
-        ...todayTask,
-        subTasks: [], // 後で埋める
-        isSubTask: false,
-        level: 0
-      };
+      // 今日期限の親タスクのサブタスクを含める（期限に関わらず全て）
+      const taskParentId = task.parentId || task.parent_id || task.parent;
 
-      // サブタスクを再帰的に取得して階層構造を構築
-      hierarchicalTask.subTasks = await getSubtasksRecursive(api, todayTask.id);
+      // 親IDがある場合、それが今日期限の親タスクIDに含まれているか、
+      // もしくは既に含まれるサブタスクの子タスクであるかを再帰的に確認
+      if (taskParentId) {
+        // 直接の親が今日期限のタスクである場合
+        if (todayTaskIds.includes(taskParentId)) return true;
 
-      // 結果配列に追加
-      hierarchicalTasks.push(hierarchicalTask);
-    }
+        // 間接的な親子関係を調べる（親の親...が今日期限のタスクである場合）
+        let currentParentId = taskParentId;
+        let ancestorTask;
 
+        // 親をたどって今日期限のタスクに行き着くか確認
+        while (currentParentId) {
+          ancestorTask = allTasks.find(t => t.id === currentParentId);
+          if (!ancestorTask) break;
+
+          const ancestorParentId = ancestorTask.parentId || ancestorTask.parent_id || ancestorTask.parent;
+          if (!ancestorParentId) break;
+
+          if (todayTaskIds.includes(ancestorParentId)) return true;
+          currentParentId = ancestorParentId;
+        }
+      }
+
+      return false;
+    });
+
+    debug(`Processing ${tasksToProcess.length} tasks (including subtasks) for today's view`);
+
+    // 階層構造を構築
+    const hierarchicalTasks = buildTaskHierarchy(tasksToProcess)
+      .filter(task => todayTaskIds.includes(task.id));
+
+    debug(`Returning ${hierarchicalTasks.length} hierarchical tasks`);
     return hierarchicalTasks;
   } catch (error) {
-    console.error('getTodayTasksWithSubtasks: エラーが発生しました', error);
+    console.error('今日のタスクとサブタスク取得中にエラーが発生しました:', error);
     throw error;
   }
 }
