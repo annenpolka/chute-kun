@@ -1,4 +1,6 @@
-- CLAUDE.mdからプロジェクト情報を取得すること
+- プロジェクトの状態を確認する際は、必ず最初にCLAUDE.mdファイルを読んでください。このファイルにはプロジェクトの全体像、開発ガイドライン、ドキュメント構造などの重要情報が含まれています。
 {
-  "referenceFiles": ["@/CLAUDE.md"]
+  "referenceFiles": ["@/CLAUDE.md"],
+  "priority": "high",
+  "readFirst": true
 }

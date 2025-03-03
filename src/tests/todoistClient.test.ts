@@ -1,15 +1,15 @@
-import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import { TodoistApi } from '@doist/todoist-api-typescript';
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import {
-  createTodoistApi,
-  getTasks,
-  getTodayTasks,
-  TaskFilter,
   buildTaskHierarchy,
+  createTodoistApi,
   flattenTaskHierarchy,
+  getTasks,
   getTasksWithSubtasks,
+  getTodayTasks,
   getTodayTasksWithSubtasks,
   HierarchicalTask,
+  TaskFilter,
   TodoistTask
 } from '../lib/todoistClient';
 
@@ -125,8 +125,14 @@ describe('Todoist Client 関数', () => {
     const tasks = await getTasks(mockApi, filter);
 
     expect(tasks).toHaveLength(2);
-    expect(tasks[0].due.date).toBe('2025-03-03');
-    expect(tasks[1].due.date).toBe('2025-03-03');
+    expect(tasks[0].due).not.toBeNull();
+    if (tasks[0].due) {
+      expect(tasks[0].due.date).toBe('2025-03-03');
+    }
+    expect(tasks[1].due).not.toBeNull();
+    if (tasks[1].due) {
+      expect(tasks[1].due.date).toBe('2025-03-03');
+    }
   });
 
   test('getTasks: 優先度でフィルタリング', async () => {
@@ -148,7 +154,10 @@ describe('Todoist Client 関数', () => {
     expect(tasks).toHaveLength(2);
     expect(tasks[0].projectId).toBe('project1');
     expect(tasks[0].isCompleted).toBe(false);
-    expect(tasks[0].due.date).toBe('2025-03-03');
+    expect(tasks[0].due).not.toBeNull();
+    if (tasks[0].due) {
+      expect(tasks[0].due.date).toBe('2025-03-03');
+    }
   });
 
   test('getTodayTasks: 今日期限の未完了タスクを取得', async () => {
@@ -482,7 +491,7 @@ describe('サブタスク構造化機能', () => {
       // 内部的にはparentIdに正規化されていることを確認
       expect(hierarchicalTasks[0].subTasks[0].parentId).toBe('1');
     });
-    
+
     test('parentプロパティを持つタスクを正しく階層構造化できる', () => {
       const tasksWithParentProperty = [
         {
@@ -630,7 +639,7 @@ describe('サブタスク構造化機能', () => {
     expect(hierarchicalTasks[0].subTasks).toHaveLength(2);
     expect(hierarchicalTasks[1].subTasks).toHaveLength(1);
     expect(hierarchicalTasks[1].subTasks[0].subTasks).toHaveLength(1);
-    
+
     // 階層レベルが正しく設定されていることを確認
     expect(hierarchicalTasks[0].level).toBe(0); // ルートタスク
     expect(hierarchicalTasks[0].subTasks[0].level).toBe(1); // 第1階層サブタスク
@@ -656,7 +665,7 @@ describe('サブタスク構造化機能', () => {
     const hierarchicalTasks = await getTodayTasksWithSubtasks(mockSubtaskApi);
 
     // APIが呼ばれたことを確認
-    expect(mockSubtaskApi.getTasks).toHaveBeenCalledTimes(2); // getTasks と getTodayTasks の両方が呼ばれる
+    expect(mockSubtaskApi.getTasks).toHaveBeenCalledTimes(1); // 変更後の実装ではgetTasksのみ呼ばれる
 
     // 元に戻す
     global.Date = realDate;
@@ -751,7 +760,7 @@ describe('サブタスク構造化機能', () => {
 
           // この親タスクのすべてのサブタスクを取得（サブタスクの定義は直接子のみではなく、全階層）
           const allSubtasks = mockMixedDateTasks.filter(t => t.parentId === task.id);
-          
+
           // 親タスクの直接の子を追加
           parentTask.subTasks = allSubtasks.map(subtask => {
             // 第1階層のサブタスク情報
@@ -762,7 +771,7 @@ describe('サブタスク構造化機能', () => {
               isSubTask: true,
               level: 1
             };
-            
+
             // サブタスクのサブタスク（第2階層）を追加
             const grandchildren = mockMixedDateTasks.filter(t => t.parentId === subtask.id);
             childTask.subTasks = grandchildren.map(grandchild => ({
@@ -772,13 +781,13 @@ describe('サブタスク構造化機能', () => {
               isSubTask: true,
               level: 2
             }));
-            
+
             return childTask;
           });
-          
+
           return parentTask;
         });
-        
+
         return hierarchicalTasks;
       }
     );
@@ -789,36 +798,36 @@ describe('サブタスク構造化機能', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('1');
     expect(result[0].content).toBe('今日期限の親タスク1');
-    
+
     // 親タスクの直下のサブタスク2つが取得できることを確認
     expect(result[0].subTasks).toHaveLength(2);
-    
+
     // 階層レベルが正しく設定されていることを確認
     expect(result[0].level).toBe(0); // 親タスク
-    
+
     // サブタスクがIDの順にソートされていないことがあるため、IDで検索
     const subTask1 = result[0].subTasks.find(task => task.id === '2');
     const subTask2 = result[0].subTasks.find(task => task.id === '3');
-    
+
     expect(subTask1).toBeDefined();
     expect(subTask2).toBeDefined();
-    
+
     if (subTask1) {
       expect(subTask1.level).toBe(1); // 第1階層サブタスク
       expect(subTask1.isSubTask).toBe(true);
-      
+
       // サブサブタスクの確認
       expect(subTask1.subTasks).toHaveLength(1);
       expect(subTask1.subTasks[0].id).toBe('5');
       expect(subTask1.subTasks[0].level).toBe(2); // 第2階層サブタスク
     }
-    
+
     if (subTask2) {
       expect(subTask2.level).toBe(1); // 第1階層サブタスク
       expect(subTask2.isSubTask).toBe(true);
       expect(subTask2.subTasks).toHaveLength(0); // サブタスクを持たない
     }
-    
+
     // モックをリストア
     jest.spyOn(require('../lib/todoistClient'), 'getTodayTasksWithSubtasks').mockRestore();
   });
