@@ -41,5 +41,6 @@
         "browser"
       ]
     }
-  ]
+  ],
+  "referenceFiles": ["@/CLAUDE.md"]
 }
