@@ -19,7 +19,8 @@ docs/
 ├── planning/                # 計画・戦略文書
 ├── processes/               # 開発プロセス定義
 ├── research/                # 調査・分析結果
-└── setup/                   # 環境構築・設定ガイド
+├── setup/                   # 環境構築・設定ガイド
+└── templates/               # ドキュメントテンプレート
 ```
 
 ## ドキュメントカテゴリ
@@ -33,20 +34,24 @@ docs/
   - [**ADR-002: TDD アプローチ採用**](./adr/ADR-002-TDD-Development-Approach.md)
   - [**ADR-003: サーバーレス設計**](./adr/ADR-003-Serverless-Architecture.md)
   - [**ADR-004: 技術スタック方針**](./adr/ADR-004-Technology-Stack-Direction.md)
+  - [**ADR-005: 階層型タスク表示機能**](./adr/ADR-005-Hierarchical-Task-Display.md)
+  - [**ADR-006: 統合テストのエラーハンドリング改善**](./adr/ADR-006-Integration-Test-Error-Handling.md)
 
 ### 2. 機能仕様
 
 - [**タスクマネージャー**](./modules/task-manager.md) - タスク管理コアモジュール
 - [**タイムブロック生成**](./features/timeblock-generation.md) - タイムブロック生成機能
-- [**ログ記録システム**](./features/log-recording.md) - タスク実行の記録機能
-- [**ルーティン管理**](./features/routine-management.md) - 定期的なタスク自動生成
+- [**サブタスク構造**](./features/subtask-structure.md) - 階層的なタスク構造の実装
+- [**タスクフォーマッター**](./features/task-formatter.md) - タスク表示形式の定義と実装
 
 ### 3. 開発・運用
 
 - [**開発計画**](./planning/development-plan.md) - プロジェクトの開発計画と実装ステップ
 - [**実装状況**](./setup/implementation-status.md) - 現在の実装状況と次のステップ
 - [**環境変数管理**](./setup/environment-variables.md) - 環境変数設定と管理方法
-- [**API 仕様**](./api/todoist-api.md) - Todoist API 連携の詳細仕様
+- [**Todoist API クライアント**](./api/todoist-client.md) - Todoist API 連携の基本仕様
+- [**Todoist API 実装詳細**](./api/todoist-client-implementation.md) - API 連携実装の詳細
+- [**Todoist API 改善計画**](./planning/todoist-api-improvement.md) - API 連携の将来的な改善案
 
 ### 4. プロセス・方法論
 
@@ -54,12 +59,20 @@ docs/
 - [**開発ワークフロー**](./processes/development-workflow.md) - ドキュメント駆動開発
 - [**コミット戦略**](./processes/commit-strategy.md) - コミット粒度とメッセージ規約
 - [**決定ログ**](./processes/decisions-log.md) - 日々の小規模な決定の記録
+- [**統合テスト実施ガイド**](./processes/integration-testing-guide.md) - Todoist API との統合テスト実施手順
 
 ### 5. 調査・研究
 
 - [**技術評価**](./decisions/technology-evaluation.md) - 技術選定評価の詳細
 - [**CLI ツール比較**](./research/cli-tools-comparison.md) - CLI ツール開発技術の比較
 - [**CLINE 設定計画**](./planning/cline-config.md) - CLINE ツール用のカスタムモード
+- [**Jest 統合テスト実装研究**](./research/jest-integration-testing.md) - Jest を用いた外部 API 統合テストの実装研究
+
+### 6. テンプレート
+
+- [**ADR テンプレート**](./templates/adr-template.md) - アーキテクチャ決定記録のテンプレート
+- [**機能仕様テンプレート**](./templates/feature-template.md) - 機能仕様書のテンプレート
+- [**モジュール設計テンプレート**](./templates/module-template.md) - モジュール設計書のテンプレート
 
 ## ドキュメント管理原則
 
@@ -82,5 +95,5 @@ docs/
 
 ## 更新履歴
 
-- 2025-03-03: ドキュメント構造を整理、カテゴリの見直しと詳細なガイドラインを追加
+- 2025-03-03: ドキュメント構造を整理、カテゴリの見直しと詳細なガイドラインを追加、新規 ADR とテスト関連ドキュメントを追加、実際のファイル構造と整合
 - 2025-03-01: 初版作成、基本構成の定義
