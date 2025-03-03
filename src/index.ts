@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 import * as path from 'path';
 import dotenv from 'dotenv';
-import { createTodoistApi, getTodayTasks, getTasks, TaskFilter } from './lib/todoistClient';
+import {
+  createTodoistApi,
+  getTodayTasks,
+  getTasks,
+  getTodayTasksWithSubtasks,
+  HierarchicalTask,
+  TaskFilter } from './lib/todoistClient';
 
 // 環境変数を読み込む
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -41,7 +47,7 @@ function parseArgs(): { command: string; options: Record<string, string> } {
 async function main() {
   try {
     const { command, options } = parseArgs();
-    
+
     // 環境変数のデバッグ情報
     console.log('環境変数の状態:');
     console.log('  プロセスID:', process.pid);
@@ -49,15 +55,15 @@ async function main() {
     console.log('  カレントディレクトリ:', process.cwd());
     console.log('  環境変数ファイルパス:', path.resolve(process.cwd(), '.env'));
     console.log('  TODOIST_API_TOKEN が設定されているか:', process.env.TODOIST_API_TOKEN ? 'はい' : 'いいえ');
-    
+
     // コマンドラインからのAPIトークンを優先
     const apiToken = options.token || process.env.TODOIST_API_TOKEN;
-    
+
     // Todoist APIクライアントを作成
     const api = createTodoistApi(apiToken);
-    
+
     console.log('Todoistに接続中...');
-    
+
     switch (command) {
       case 'today':
         await showTodayTasks(api);
@@ -70,7 +76,7 @@ async function main() {
         showHelp();
         break;
     }
-    
+
   } catch (error) {
     console.error('エラーが発生しました:', error);
     process.exit(1);
@@ -82,16 +88,47 @@ async function main() {
  */
 async function showTodayTasks(api: any) {
   console.log('今日のタスクを取得中...');
-  
-  // 今日のタスクを取得
-  const todayTasks = await getTodayTasks(api);
-  
-  console.log(`今日のタスク (${todayTasks.length}件):`);
-  
-  // タスク一覧を表示
-  todayTasks.forEach((task, index) => {
-    const priority = '!'.repeat(task.priority) || '-';
-    console.log(`${index + 1}. [${priority}] ${task.content}`);
+
+  // 今日のタスクとそのサブタスクを取得
+  const hierarchicalTasks = await getTodayTasksWithSubtasks(api);
+
+  // 階層構造を持つタスクの総数を計算
+  const totalTaskCount = countTotalTasks(hierarchicalTasks);
+
+  console.log(`今日のタスクとサブタスク (${totalTaskCount}件):`);
+
+  // 階層構造を持つタスク一覧を表示
+  displayHierarchicalTasks(hierarchicalTasks);
+}
+
+/**
+ * 階層構造を持つタスクの総数を計算
+ */
+function countTotalTasks(tasks: HierarchicalTask[]): number {
+  let count = tasks.length;
+
+  for (const task of tasks) {
+    if (task.subTasks && task.subTasks.length > 0) {
+      count += countTotalTasks(task.subTasks);
+    }
+  }
+
+  return count;
+}
+
+/**
+ * 階層構造を持つタスク一覧を表示
+ */
+function displayHierarchicalTasks(tasks: HierarchicalTask[], level: number = 0) {
+  const indent = '  '.repeat(level);
+
+  tasks.forEach((task, index) => {
+    const priority = task.priority ? '!'.repeat(task.priority) : '-';
+    console.log(`${indent}${level === 0 ? (index + 1) + '.' : '•'} [${priority}] ${task.content}`);
+
+    if (task.subTasks && task.subTasks.length > 0) {
+      displayHierarchicalTasks(task.subTasks, level + 1);
+    }
   });
 }
 
@@ -100,9 +137,9 @@ async function showTodayTasks(api: any) {
  */
 async function filterTasks(api: any, options: Record<string, string>) {
   console.log('タスクをフィルタリング中...');
-  
+
   const filter: TaskFilter = {};
-  
+
   // オプションから検索条件を構築
   if (options.project) {
     filter.projectId = options.project;
@@ -119,18 +156,18 @@ async function filterTasks(api: any, options: Record<string, string>) {
   if (options.priority) {
     filter.priority = parseInt(options.priority);
   }
-  
+
   // フィルタ条件を表示
   console.log('検索条件:', filter);
-  
+
   // タスクを取得
   const tasks = await getTasks(api, filter);
-  
+
   console.log(`検索結果 (${tasks.length}件):`);
-  
+
   // タスク一覧を表示
   tasks.forEach((task, index) => {
-    const priority = '!'.repeat(task.priority) || '-';
+    const priority = task.priority ? '!'.repeat(task.priority) : '-';
     const dueDate = task.due ? `(期限: ${task.due.date})` : '';
     console.log(`${index + 1}. [${priority}] ${task.content} ${dueDate}`);
   });

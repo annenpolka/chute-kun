@@ -1,10 +1,10 @@
-# 実装状況と進捗
+# 実装状況と進捗 / Implementation Status and Progress
 
-*最終更新日: 2025-03-03*
+*最終更新日 / Last Updated: 2025-03-03*
 
-## 現在の実装状況
+## 現在の実装状況 / Current Implementation Status
 
-### 1. プロジェクト構成
+### 1. プロジェクト構成 / Project Structure
 
 ```
 src/
@@ -20,9 +20,9 @@ src/
 - 基本的なプロジェクト設定ファイル（package.json、tsconfig.json）の設定完了
 - 関数ベースのアーキテクチャを採用
 
-### 2. 実装済み機能
+### 2. 実装済み機能 / Implemented Features
 
-#### Todoist APIクライアント
+#### Todoist APIクライアント / Todoist API Client
 
 - `createTodoistApi()`: APIトークンからTodoist APIクライアントを作成
 - `getTasks()`: 条件付きタスク検索機能
@@ -33,8 +33,19 @@ src/
   - 優先度
   でのフィルタリングをサポート
 - `getTodayTasks()`: 今日期限の未完了タスク取得
+- **APIレスポンス形式の多様性に対応**（配列形式、resultsプロパティ、itemsプロパティ）
+- **parentIdとparent_idの両方に対応**（TypeScriptクライアント形式とAPI応答形式）
 
-#### コマンドラインインターフェース
+#### サブタスク構造化機能 / Subtask Structuring Feature
+
+- `buildTaskHierarchy()`: タスク配列を階層構造に変換
+- `flattenTaskHierarchy()`: 階層構造をフラットな配列に変換（表示用）
+- `getTasksWithSubtasks()`: サブタスク情報を含むタスクを取得
+- `getTodayTasksWithSubtasks()`: 今日期限のサブタスク情報を含むタスクを取得
+- 多階層（複数レベルのネスト）のサブタスク構造に対応
+- **親子関係の検出ロジックを強化**（parentId、parent_id、parentの各プロパティに対応）
+
+#### コマンドラインインターフェース / Command Line Interface
 
 - `today`: 今日期限のタスク一覧表示
 - `filter`: 条件指定によるタスクフィルタリング
@@ -46,79 +57,96 @@ src/
 - `help`: 使用方法の表示
 - `--token`: コマンドラインからのTodoist APIトークン指定
 
-### 3. テスト状況
+### 3. テスト状況 / Testing Status
 
-- ユニットテスト: 11テストケース（全て成功）
+- ユニットテスト: 31テストケース（全て成功）
   - API接続テスト
   - フィルタリングテスト
   - エラー処理テスト
+  - サブタスク構造化テスト
+    - 階層構造変換テスト
+    - フラット化テスト
+    - サブタスク取得テスト
+    - 多階層サブタスクテスト
+  - **APIレスポンス形式テスト**
+    - 配列形式、resultsプロパティ、itemsプロパティの各形式に対応
+    - parentIdとparent_id両方への対応テスト
 
-### 4. 技術スタック
+### 4. 技術スタック / Technology Stack
 
 - 言語: TypeScript
 - ランタイム: Node.js
 - パッケージ管理: npm
 - テストフレームワーク: Jest
-- 外部API: Todoist REST API v2
+- 外部API: Todoist REST API v9
+- 外部ライブラリ: @doist/todoist-api-typescript (v4.0.0-alpha.3)
 
-### 5. 設計アプローチ
+### 5. 設計アプローチ / Design Approach
 
 - 関数ベース: クラスを使わない純粋関数のアプローチを採用
 - モジュール分割: 機能ごとに適切にモジュール化
 - 型安全性: TypeScriptの静的型チェックを活用
 - TDD: テスト駆動開発を実践
+- ドキュメント駆動: 実装前にドキュメントを作成・更新
 
-## 次のマイルストーン
+## 次のマイルストーン / Next Milestones
 
-### 短期目標（優先度高）
+### 短期目標（優先度高） / Short-term Goals (High Priority)
 
-1. **タスクの優先度分析機能**
+1. **タスクの優先度分析機能 / Task Priority Analysis**
    - 各タスクの優先度・緊急度を評価する関数の実装
    - タスク内容、ラベル、プロジェクトから優先度を算出
 
-2. **所要時間予測機能**
+2. **所要時間予測機能 / Time Estimation**
    - タスクの所要時間を予測する関数の実装
    - 過去のログがない場合の仮定値の設定
 
-3. **タイムブロック生成ロジック**
+3. **タイムブロック生成ロジック / Time Block Generation Logic**
    - 優先度と所要時間に基づいたスケジューリングアルゴリズム
    - 一日の時間枠内にタスクを適切に配置
+   - **サブタスクを考慮した時間配分の実装**
+   - 親タスクとサブタスク間の依存関係の反映
 
-### 中期目標
+### 中期目標 / Medium-term Goals
 
-1. **CLIインターフェース**
+1. **CLIインターフェース拡張 / CLI Interface Extension**
    - コマンドライン引数の処理
    - インタラクティブなCLIエクスペリエンス
+   - **階層的なタスク表示機能**
 
-2. **実績記録機能**
+2. **実績記録機能 / Performance Recording**
    - タスク開始・完了のタイムスタンプ記録
    - 実績と予測の差分分析
+   - **サブタスクの完了状況に基づく親タスクの進捗管理**
 
-3. **設定管理**
+3. **設定管理 / Configuration Management**
    - ユーザー設定の保存と読み込み
    - カスタマイズ可能なパラメータ
 
-### 長期目標
+### 長期目標 / Long-term Goals
 
-1. **LLM統合**
+1. **LLM統合 / LLM Integration**
    - Gemini API連携
    - タスク分析の精度向上
+   - **サブタスク構造の自動提案機能**
 
-2. **学習機能**
+2. **学習機能 / Learning Capability**
    - 過去の実績データからの学習
    - 予測精度の継続的改善
+   - **サブタスクパターンの認識と効率化提案**
 
-## 既知の課題
+## 既知の課題 / Known Issues
 
 1. Todoist APIの型定義の扱いが不完全（any型の使用）
 2. エラーハンドリングの改善が必要
 3. 環境変数管理の強化
-4. 新しいTodoist APIとの互換性調整（レスポンス形式の差異）
-5. APIトークンが無効な場合のエラー表示の改善
+4. APIトークンが無効な場合のエラー表示の改善
+5. **非常に深い階層のサブタスク構造（10階層以上）の処理最適化**
+6. **循環参照を含むサブタスク構造の検出と解消**
 
-## 環境設定
+## 環境設定 / Environment Setup
 
-### 環境変数
+### 環境変数 / Environment Variables
 `.env` ファイルで以下の設定が可能:
 
 ```
@@ -130,7 +158,7 @@ APP_ENV=development  # development, production
 LOG_LEVEL=debug      # debug, info, warn, error
 ```
 
-### 実行方法
+### 実行方法 / Execution Methods
 
 ```bash
 # 開発モード実行
@@ -145,10 +173,12 @@ npm start -- today
 npm run dev -- today --token your_todoist_api_token
 ```
 
-## 次のステップ
+## 次のステップ / Next Steps
 
 1. タスクモデルの拡張（所要時間や優先度の追加）
 2. タイムブロックモデルの実装
-3. スケジューリングアルゴリズムの実装
-4. データの永続化（ローカルストレージの実装）
-5. レポート生成機能の追加
+3. **サブタスクを考慮したタイムブロック生成の実装**
+4. **階層的なタスク表示機能の実装**
+5. スケジューリングアルゴリズムの実装
+6. データの永続化（ローカルストレージの実装）
+7. レポート生成機能の追加
