@@ -55,15 +55,15 @@ async function main() {
     // アプリケーション起動メッセージ
     if (isDebugMode) {
       console.log('デバッグモード: 有効');
+      
+      // 環境変数のデバッグ情報
+      debug('環境変数の状態:');
+      debug('  プロセスID:', process.pid);
+      debug('  環境:', process.env.APP_ENV || '未設定');
+      debug('  カレントディレクトリ:', process.cwd());
+      debug('  環境変数ファイルパス:', path.resolve(process.cwd(), '.env'));
+      debug('  TODOIST_API_TOKEN が設定されているか:', process.env.TODOIST_API_TOKEN ? 'はい' : 'いいえ');
     }
-
-    // 環境変数のデバッグ情報
-    console.log('環境変数の状態:');
-    console.log('  プロセスID:', process.pid);
-    console.log('  環境:', process.env.APP_ENV || '未設定');
-    console.log('  カレントディレクトリ:', process.cwd());
-    console.log('  環境変数ファイルパス:', path.resolve(process.cwd(), '.env'));
-    console.log('  TODOIST_API_TOKEN が設定されているか:', process.env.TODOIST_API_TOKEN ? 'はい' : 'いいえ');
 
     // コマンドラインからのAPIトークンを優先
     const apiToken = options.token || process.env.TODOIST_API_TOKEN;
@@ -72,6 +72,7 @@ async function main() {
     const api = createTodoistApi(apiToken);
 
     console.log('Todoistに接続中...');
+    debug('APIトークン取得元:', options.token ? 'コマンドラインオプション' : '環境変数');
 
     switch (command) {
       case 'today':
@@ -100,6 +101,7 @@ async function showTodayTasks(api: any, options: Record<string, string> = {}) {
 
   // 今日のタスクを取得
   const todayTasks = await getTodayTasks(api);
+  debug('取得したタスク数:', todayTasks.length);
 
   console.log(`今日のタスク (${todayTasks.length}件):`);
   
@@ -151,10 +153,21 @@ async function filterTasks(api: any, options: Record<string, string>) {
   }
 
   // フィルタ条件を表示
+  debug('使用されたオプション:', options);
   console.log('検索条件:', filter);
 
   // タスクを取得
   const tasks = await getTasks(api, filter);
+  debug('取得したタスク数:', tasks.length);
+  
+  if (tasks.length > 0) {
+    debug('最初のタスク例:', {
+      id: tasks[0].id,
+      content: tasks[0].content,
+      projectId: tasks[0].projectId,
+      due: tasks[0].due
+    });
+  }
 
   console.log(`検索結果 (${tasks.length}件):`);
 
