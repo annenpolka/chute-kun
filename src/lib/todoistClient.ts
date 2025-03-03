@@ -95,24 +95,34 @@ export function createTodoistApi(apiToken?: string): TodoistApi {
 }
 
 /**
- * 条件に基づいてタスクを取得
+ * タスクを取得
  * @param api - TodoistApiインスタンス
  * @param filter - タスク検索条件
  * @returns 条件に合致するタスクの配列
  */
 export async function getTasks(api: TodoistApi | any, filter?: TaskFilter): Promise<TodoistTask[]> {
   try {
-    const response = await api.getTasks();
+    console.log('タスク取得開始...');
 
-    // APIの戻り値を確認
-    debug('API response type:', typeof response);
-    debug('API response structure:', response);
+    // パラメータなしでAPI呼び出し
+    const response: any = await api.getTasks();
+
+    // APIの戻り値の型を確認
+    console.log('API response type:', typeof response);
 
     // 新しいTodoist APIではレスポンスがオブジェクトで、resultsプロパティに配列がある
-    // APIの戻り値を正規化（配列、resultsプロパティ、itemsプロパティのいずれかに対応）
-    // Array format: [task1, task2, ...]
-    // Object format: { results: [task1, task2, ...] } or { items: [task1, task2, ...] }
-    const tasks = Array.isArray(response) ? response : (response.results || response.items || []);
+    // APIの戻り値を正規化
+    const tasks = Array.isArray(response)
+      ? response
+      : (response.results || response.items || []);
+
+    console.log(`タスク取得完了: ${tasks.length}件`);
+
+    // APIがデフォルトで50件しか返さない場合、ユーザーに警告
+    if (tasks.length === 50) {
+      console.log('注意: Todoist APIがデフォルトで最大50件のタスクしか返しません。');
+      console.log('取得されていないタスクがある可能性があります。');
+    }
 
     if (!filter) {
       return tasks as TodoistTask[];
@@ -160,37 +170,69 @@ export async function getTasks(api: TodoistApi | any, filter?: TaskFilter): Prom
 }
 
 /**
- * 今日期限のタスクを取得
+ * 日付をYYYY-MM-DD形式にフォーマットする
+ * @param date - フォーマットする日付
+ * @returns YYYY-MM-DD形式の日付文字列
+ */
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 今日のタスクを取得
  * @param api - TodoistApiインスタンス
- * @returns 今日期限のタスクの配列
+ * @returns 今日が期限のタスク配列
  */
 export async function getTodayTasks(api: TodoistApi | any): Promise<TodoistTask[]> {
   try {
-    debug('Getting all tasks first, then filtering for today');
+    console.log('今日のタスクを取得中...');
+
+    // すべてのタスクを取得（ページネーション対応済みのgetTasks関数を使用）
     const allTasks = await getTasks(api);
-    debug(`Retrieved ${allTasks.length} total tasks`);
 
-    // 今日の日付を取得（YYYY-MM-DD形式）
-    const today = new Date().toISOString().split('T')[0];
-    debug(`Today's date: ${today}`);
+    // 今日の日付を取得
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = formatDate(today);
 
-    // 今日期限のタスク（完了タスクを除く）をフィルタリング
-    const todayTasks = allTasks.filter(task => {
-      // 完了済みのタスクは含めない
+    console.log(`今日の日付: ${todayStr}`);
+    console.log(`取得したタスク総数: ${allTasks.length}件`);
+
+    // 今日が期限のタスクをフィルタリング
+    const todayTasks = allTasks.filter((task: TodoistTask) => {
+      // 完了済みタスクを除外
       if (task.isCompleted) return false;
 
-      // より明示的なnullチェック
-      const hasDueDate = typeof task.due === 'object' && task.due !== null && typeof task.due.date === 'string';
-      const isDueToday = hasDueDate && task.due!.date === today;
+      // 期限日がないタスクを除外
+      if (!task.due || !task.due.date) return false;
 
-      return isDueToday;
+      // デバッグ情報を出力
+      // console.log(`タスク「${task.content}」の期限: ${task.due.date}, 今日: ${todayStr}`);
+
+      // 期限日が今日のタスクを抽出
+      return task.due.date === todayStr;
     });
 
-    debug(`Found ${todayTasks.length} tasks due today`);
+    console.log(`今日が期限のタスク数: ${todayTasks.length}件`);
+
+    // デバッグ用に今日のタスクの内容と期限日を出力
+    todayTasks.forEach((task: TodoistTask) => {
+      console.log(`今日のタスク: 「${task.content}」(期限: ${task.due?.date})`);
+    });
+
     return todayTasks;
   } catch (error) {
     console.error('今日のタスク取得中にエラーが発生しました:', error);
-    throw error;
+
+    // エラー発生時は現在の日付でフィルタリングして取得
+    const today = new Date();
+    return getTasks(api, {
+      dueDate: formatDate(today),
+      isCompleted: false
+    });
   }
 }
 
