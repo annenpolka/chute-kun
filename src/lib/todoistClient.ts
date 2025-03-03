@@ -168,11 +168,11 @@ export function buildTaskHierarchy(tasks: TodoistTask[]): HierarchicalTask[] {
   tasks.forEach(task => {
     const structuredTask: HierarchicalTask = {
       ...task,
-      // parentIdとparent_idの両方に対応（内部的にはparentIdに正規化）
-      parentId: task.parentId || task.parent_id,
+      // parentId、parent_id、parentの3つの形式に対応（内部的にはparentIdに正規化）
+      parentId: task.parentId || task.parent_id || task.parent,
       subTasks: [],
-      // parentIdとparent_idの両方に対応
-      isSubTask: !!(task.parentId || task.parent_id),
+      // 全ての親子関係表現形式に対応
+      isSubTask: !!(task.parentId || task.parent_id || task.parent),
       level: 0
     };
     taskMap.set(task.id, structuredTask);
@@ -186,8 +186,8 @@ export function buildTaskHierarchy(tasks: TodoistTask[]): HierarchicalTask[] {
     const structuredTask = taskMap.get(task.id);
 
     if (structuredTask) {
-      // parentIdとparent_idの両方に対応
-      const parentId = task.parentId || task.parent_id;
+      // parentId、parent_id、parentの3つの形式に対応
+      const parentId = task.parentId || task.parent_id || task.parent;
       if (parentId && taskMap.has(parentId)) {
         // 親タスクが存在する場合、サブタスクとして追加
         const parentTask = taskMap.get(parentId);
@@ -246,6 +246,114 @@ export async function getTasksWithSubtasks(
 }
 
 /**
+ * 直接APIからサブタスクを取得する関数
+ * @param api - TodoistApiインスタンス 
+ * @param parentId - 親タスクID
+ * @returns 親タスクの直下のサブタスク配列
+ */
+export async function getSubtasks(
+  api: TodoistApi | any,
+  parentId: string
+): Promise<TodoistTask[]> {
+  console.log(`親タスク(ID: ${parentId})のサブタスクを直接APIから取得します...`);
+  
+  try {
+    // 全タスクを取得
+    const allTasks = await getTasks(api);
+    
+    // 親IDに一致するサブタスクをフィルタリング
+    const subtasks = allTasks.filter(task => {
+      // parentId、parent_id、parentのいずれかを使用して親子関係を検出
+      const taskParentId = task.parentId || task.parent_id || task.parent;
+      return taskParentId === parentId;
+    });
+    
+    return subtasks;
+  } catch (error) {
+    console.error(`サブタスク取得中にエラーが発生しました:`, error);
+    throw error;
+  }
+}
+
+/**
+ * 再帰的にサブタスクを取得して階層構造を構築する関数
+ * @param api - TodoistApiインスタンス
+ * @param parentId - 親タスクID
+ * @param level - 階層レベル（再帰呼び出し用）
+ * @returns 階層構造化されたサブタスクの配列
+ */
+export async function getSubtasksRecursive(
+  api: TodoistApi | any,
+  parentId: string,
+  level = 1
+): Promise<HierarchicalTask[]> {
+  console.log(`階層レベル ${level} - 親タスク(ID: ${parentId})のサブタスクを再帰的に取得します...`);
+  
+  try {
+    // 直接のサブタスクを取得
+    const directSubtasks = await getSubtasks(api, parentId);
+    
+    // 階層構造を構築
+    const result: HierarchicalTask[] = [];
+    
+    for (const task of directSubtasks) {
+      // 階層タスクの構築
+      const hierarchicalTask: HierarchicalTask = {
+        ...task,
+        parentId: task.parentId || task.parent_id || task.parent,
+        subTasks: [], // 後で更新
+        isSubTask: true,
+        level: level
+      };
+      
+      // 子タスク（このタスクのサブタスク）を再帰的に取得
+      hierarchicalTask.subTasks = await getSubtasksRecursive(api, task.id, level + 1);
+      
+      result.push(hierarchicalTask);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`再帰的サブタスク取得中にエラーが発生しました:`, error);
+    throw error;
+  }
+}
+
+/**
+ * 指定されたタスクIDのすべてのサブタスク（多階層）を取得
+ * @param tasks - すべてのタスクの配列
+ * @param parentId - 親タスクID
+ * @param collectedIds - 既に集められたタスクIDのセット（再帰呼び出し用）
+ * @returns 親タスクの下位にあるすべてのサブタスクIDのセット
+ */
+export function collectAllSubtaskIds(
+  tasks: TodoistTask[],
+  parentId: string,
+  collectedIds: Set<string> = new Set<string>()
+): Set<string> {
+  // 親タスクの直下のサブタスクを検索
+  const directSubtasks = tasks.filter(task => {
+    // parentId、parent_id、parentのいずれかを使用して親子関係を検出
+    const taskParentId = task.parentId || task.parent_id || task.parent;
+    return taskParentId === parentId;
+  });
+
+  // 直下のサブタスクがない場合
+  if (directSubtasks.length === 0) {
+    return collectedIds;
+  }
+
+  // 直下のサブタスクをセットに追加
+  directSubtasks.forEach(subtask => {
+    collectedIds.add(subtask.id);
+    // 再帰的に各サブタスクのサブタスクを検索
+    collectAllSubtaskIds(tasks, subtask.id, collectedIds);
+  });
+
+  return collectedIds;
+}
+
+/**
  * 今日期限のタスクとそのサブタスク（期限問わず）を取得
  * @param api - TodoistApiインスタンス
  * @returns 階層構造化された今日期限のタスクとそのサブタスクの配列
@@ -254,107 +362,38 @@ export async function getTodayTasksWithSubtasks(
   api: TodoistApi | any
 ): Promise<HierarchicalTask[]> {
   try {
-    console.log('getTodayTasksWithSubtasks: 今日期限のタスクとそのサブタスクを取得します');
-
-    // 全タスクを取得
+    // まず全タスクを取得
     const allTasks = await getTasks(api);
 
-    // 今日期限のタスクを取得（Todoist APIのfilter: 'today'パラメータを使用）
+    // 今日期限のタスクを取得
     const todayTasks = await getTodayTasks(api);
-    console.log(`今日期限のタスク数（getTodayTasks）: ${todayTasks.length}`);
-
-    // テスト用のタスクを表示
-    const testTasks = todayTasks.filter(task => task.content.includes('テストタスク'));
-    console.log(`テスト用の今日期限のタスク数: ${testTasks.length}`);
-    testTasks.forEach(task => console.log(`- ${task.content} (ID: ${task.id})`));
 
     // 今日期限のタスクがない場合は空配列を返す
     if (todayTasks.length === 0) {
-      console.log('今日期限のタスクが見つかりませんでした');
       return [];
     }
 
-    // 今日期限のタスクのIDを抽出
-    const todayTaskIds = todayTasks.map(task => task.id);
-    console.log(`今日期限のタスクID: ${todayTaskIds.join(', ')}`);
-
-    // 全タスクを再取得（サブタスク情報を含む）
-    console.log('全タスクを再取得します...');
-    const response = await api.getTasks();
-    // APIの戻り値を正規化（配列、resultsプロパティ、itemsプロパティのいずれかに対応）
-    // Array format: [task1, task2, ...]
-    // Object format: { results: [task1, task2, ...] } or { items: [task1, task2, ...] }
-    const tasks = Array.isArray(response) ? response : (response.results || response.items || []) as TodoistTask[];
-    console.log(`全タスク数（再取得）: ${tasks.length}`);
-
-    // APIの戻り値の形式を確認
-    if (tasks.length > 0) {
-      const sampleTask = tasks[0];
-      const sampleSubTask = tasks.find(task => task.parentId || task.parent_id);
-      if (sampleSubTask) {
-        console.log('サンプルサブタスクの形式:');
-        console.log(JSON.stringify(sampleSubTask, null, 2));
-      }
-
-      console.log('サンプルタスクの形式:');
-      console.log(JSON.stringify(sampleTask, null, 2));
+    // 階層構造を持つタスク配列
+    const hierarchicalTasks: HierarchicalTask[] = [];
+    
+    // 今日期限の各タスクを処理
+    for (const todayTask of todayTasks) {
+      // 親タスクの階層構造を作成
+      const hierarchicalTask: HierarchicalTask = {
+        ...todayTask,
+        subTasks: [], // 後で埋める
+        isSubTask: false,
+        level: 0
+      };
+      
+      // サブタスクを再帰的に取得して階層構造を構築
+      hierarchicalTask.subTasks = await getSubtasksRecursive(api, todayTask.id);
+      
+      // 結果配列に追加
+      hierarchicalTasks.push(hierarchicalTask);
     }
-
-    // 今日期限のタスクを含める
-    const relevantTasks: TodoistTask[] = [];
-
-    // 今日期限のタスクを追加
-    for (const todayTaskId of todayTaskIds) {
-      const todayTask = tasks.find(task => task.id === todayTaskId);
-      if (todayTask) {
-        relevantTasks.push(todayTask);
-        console.log(`今日期限のタスクを追加: ${todayTask.content} (ID: ${todayTask.id})`);
-      }
-    }
-
-    // サブタスクを検索して追加
-    for (const task of tasks) {
-      // デバッグ: すべてのタスクの親子関係を確認
-      // 親子関係の検出には、parentId、parent_id、parentのいずれかのプロパティを使用
-      if (task.parentId || task.parent_id) {
-        console.log(`サブタスク検出: ${task.content} (ID: ${task.id})`);
-        console.log(`  親ID: ${task.parentId || task.parent_id}`);
-      }
-
-      // parentIdプロパティを確認（TypeScriptクライアント形式）
-      if (task.parentId && todayTaskIds.includes(task.parentId)) {
-        console.log(`サブタスク候補（parentId）: ${task.content} (ID: ${task.id}, 親ID: ${task.parentId})`);
-        if (!relevantTasks.some(t => t.id === task.id)) {
-          relevantTasks.push(task);
-          console.log(`サブタスクを追加（parentId）: ${task.content} (ID: ${task.id}, 親ID: ${task.parentId})`);
-        }
-      }
-      // parent_idプロパティを確認（API応答形式）
-      else if (task.parent_id && todayTaskIds.includes(task.parent_id)) {
-        console.log(`サブタスク候補（parent_id）: ${task.content} (ID: ${task.id}, 親ID: ${task.parent_id})`);
-        if (!relevantTasks.some(t => t.id === task.id)) {
-          const taskWithParentId = { ...task, parentId: task.parent_id };
-          relevantTasks.push(taskWithParentId);
-          console.log(`サブタスクを追加（parent_id）: ${task.content} (ID: ${task.id}, 親ID: ${task.parent_id})`);
-        }
-      }
-      // 統合テスト用の特別処理：文字列形式のparentIdを確認
-      else if (typeof task.parentId === 'string' && todayTaskIds.some(id => task.parentId === id)) {
-        console.log(`サブタスク候補（文字列parentId）: ${task.content} (ID: ${task.id}, 親ID: ${task.parentId})`);
-        if (!relevantTasks.some(t => t.id === task.id)) {
-          relevantTasks.push(task);
-          console.log(`サブタスクを追加（文字列parentId）: ${task.content} (ID: ${task.id}, 親ID: ${task.parentId})`);
-        }
-      // parentプロパティを確認（別の可能性のある形式）
-      } else if (task.parent && todayTaskIds.includes(task.parent)) {
-        console.log(`サブタスク候補（parent）: ${task.content} (ID: ${task.id}, 親ID: ${task.parent})`);
-      }
-    }
-
-    console.log(`関連タスク数: ${relevantTasks.length}`);
-
-    // タスクを階層構造化
-    return buildTaskHierarchy(relevantTasks);
+    
+    return hierarchicalTasks;
   } catch (error) {
     console.error('getTodayTasksWithSubtasks: エラーが発生しました', error);
     throw error;

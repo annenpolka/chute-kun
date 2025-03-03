@@ -6,6 +6,65 @@
 
 本ドキュメントは、TodoistのREST APIを使用して今日のタスクとそのサブタスクを取得する処理の改善実装結果を記述します。[改善計画](../planning/todoist-api-improvement.md)に基づいて実装を行い、APIの仕様変更に対応し、サブタスクが正しく取得できるように改善しました。
 
+## 最新の実装
+
+### 再帰的サブタスク取得機能
+
+最新の実装では、再帰的にサブタスクを取得・構築する機能を追加しました：
+
+```typescript
+/**
+ * 再帰的にサブタスクを取得して階層構造を構築する関数
+ * @param api - TodoistApiインスタンス
+ * @param parentId - 親タスクID
+ * @param level - 階層レベル（再帰呼び出し用）
+ * @returns 階層構造化されたサブタスクの配列
+ */
+export async function getSubtasksRecursive(
+  api: TodoistApi | any,
+  parentId: string,
+  level = 1
+): Promise<HierarchicalTask[]> {
+  console.log(`階層レベル ${level} - 親タスク(ID: ${parentId})のサブタスクを再帰的に取得します...`);
+  
+  try {
+    // 直接のサブタスクを取得
+    const directSubtasks = await getSubtasks(api, parentId);
+    console.log(`親タスク(ID: ${parentId})の直接のサブタスク数: ${directSubtasks.length}`);
+    
+    // 階層構造を構築
+    const result: HierarchicalTask[] = [];
+    
+    for (const task of directSubtasks) {
+      // 親IDの正規化（内部的にはparentIdを使用）
+      if (task.parent_id && !task.parentId) {
+        task.parentId = task.parent_id;
+      }
+      
+      // 階層タスクの構築
+      const hierarchicalTask: HierarchicalTask = {
+        ...task,
+        subTasks: [], // 後で更新
+        isSubTask: true,
+        level: level
+      };
+      
+      // 子タスク（このタスクのサブタスク）を再帰的に取得
+      hierarchicalTask.subTasks = await getSubtasksRecursive(api, task.id, level + 1);
+      
+      result.push(hierarchicalTask);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`再帰的サブタスク取得中にエラーが発生しました:`, error);
+    throw error;
+  }
+}
+```
+
+この実装により、多階層（親→子→孫→...）のサブタスク構造を正確に取得・構築できるようになりました。
+
 ## 実装内容
 
 ### 1. APIレスポンス形式の多様性への対応
@@ -157,9 +216,15 @@ else if (task.parent_id && todayTaskIds.includes(task.parent_id)) {
    - `getTodayTasksWithSubtasks`関数で取得
    - 階層構造が正しいことを検証
 
-2. **エッジケースのテスト**
+2. **再帰的サブタスク取得のテスト**
+   - 複数階層のサブタスク構造を作成（親→子→孫）
+   - `getSubtasksRecursive`関数で取得
+   - 階層構造が正しく構築されていることを検証
+
+3. **エッジケースのテスト**
    - サブタスクが存在しない場合
    - 期限のないサブタスク
+   - 非常に深い階層構造（5階層以上）
 
 ## 今後の課題
 
@@ -171,8 +236,15 @@ else if (task.parent_id && todayTaskIds.includes(task.parent_id)) {
 2. **キャッシュ機構**
    - 頻繁なAPI呼び出しを減らすためのキャッシュ実装
 
-3. **リアルタイム更新**
+3. **パフォーマンス最適化**
+   - 再帰的サブタスク取得と一括取得後のフィルタリングの性能比較
+   - 大量のタスクがある場合の処理速度の改善
+
+4. **リアルタイム更新**
    - Webhookを活用したリアルタイム更新機能
+
+5. **CLI拡張**
+   - サブタスクコマンドの機能拡張（階層レベル制限、フィルタリングオプション）
 
 ## 参考資料
 

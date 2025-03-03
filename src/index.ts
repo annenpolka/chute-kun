@@ -5,8 +5,6 @@ import {
   createTodoistApi,
   getTodayTasks,
   getTasks,
-  getTodayTasksWithSubtasks,
-  HierarchicalTask,
   TaskFilter } from './lib/todoistClient';
 
 // 環境変数を読み込む
@@ -66,7 +64,7 @@ async function main() {
 
     switch (command) {
       case 'today':
-        await showTodayTasks(api);
+        await showTodayTasks(api, options);
         break;
       case 'filter':
         await filterTasks(api, options);
@@ -86,49 +84,33 @@ async function main() {
 /**
  * 今日のタスクを表示
  */
-async function showTodayTasks(api: any) {
+async function showTodayTasks(api: any, options: Record<string, string> = {}) {
   console.log('今日のタスクを取得中...');
 
-  // 今日のタスクとそのサブタスクを取得
-  const hierarchicalTasks = await getTodayTasksWithSubtasks(api);
+  // 今日のタスクを取得
+  const todayTasks = await getTodayTasks(api);
 
-  // 階層構造を持つタスクの総数を計算
-  const totalTaskCount = countTotalTasks(hierarchicalTasks);
-
-  console.log(`今日のタスクとサブタスク (${totalTaskCount}件):`);
-
-  // 階層構造を持つタスク一覧を表示
-  displayHierarchicalTasks(hierarchicalTasks);
+  console.log(`今日のタスク (${todayTasks.length}件):`);
+  
+  // 親タスクのみを表示
+  displayTasks(todayTasks);
 }
 
 /**
- * 階層構造を持つタスクの総数を計算
+ * タスク一覧を表示
  */
-function countTotalTasks(tasks: HierarchicalTask[]): number {
-  let count = tasks.length;
-
-  for (const task of tasks) {
-    if (task.subTasks && task.subTasks.length > 0) {
-      count += countTotalTasks(task.subTasks);
-    }
-  }
-
-  return count;
-}
-
-/**
- * 階層構造を持つタスク一覧を表示
- */
-function displayHierarchicalTasks(tasks: HierarchicalTask[], level: number = 0) {
-  const indent = '  '.repeat(level);
-
+function displayTasks(tasks: any[]): void {
   tasks.forEach((task, index) => {
+    // 優先度を!記号で表示（4が最高優先度）
     const priority = task.priority ? '!'.repeat(task.priority) : '-';
-    console.log(`${indent}${level === 0 ? (index + 1) + '.' : '•'} [${priority}] ${task.content}`);
-
-    if (task.subTasks && task.subTasks.length > 0) {
-      displayHierarchicalTasks(task.subTasks, level + 1);
-    }
+    
+    // 完了状態を表示
+    const statusMarker = task.isCompleted ? '✓' : '□';
+    
+    // 期限情報を表示（あれば）
+    const dueInfo = task.due ? `[期限: ${task.due.date}]` : '';
+    
+    console.log(`${index + 1}. ${statusMarker} [${priority}] ${task.content} ${dueInfo}`);
   });
 }
 
