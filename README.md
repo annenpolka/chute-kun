@@ -118,7 +118,7 @@ MIT
 ## 関連ドキュメント
 
 - [TaskChute methodology](TaskChute_methodology.md)
+- [ドキュメント一覧](docs/README.md)
 - [システム概要](docs/system-overview.md)
-- [データモデル](docs/data/models.md)
-- [実装状況](docs/IMPLEMENTATION.md)
-- [開発計画](docs/DEVELOPMENT_PLAN.md)
+- [実装状況](docs/setup/implementation-status.md)
+- [開発計画](docs/planning/development-plan.md)

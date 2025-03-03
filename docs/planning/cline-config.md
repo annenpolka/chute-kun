@@ -1,8 +1,8 @@
-# chute_kunプロジェクトの.clinerules計画
+# chute_kunプロジェクトのCLINE設定計画
 
 ## 概要
 
-このドキュメントは、chute_kunプロジェクト用の`.clinerules`ファイルの内容を提案するものです。プロジェクトの特性に合わせた4つのカスタムモードを定義しています。
+このドキュメントは、chute_kunプロジェクト用のCLINE設定ファイル(`.clinerules`)の内容を提案するものです。[CLINE](https://github.com/cline-app/cline)はターミナルベースのClaude AIインターフェースで、プロジェクトの特性に合わせて4つのカスタムモードを定義しています。
 
 ## .clinerules ファイル内容
 
