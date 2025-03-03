@@ -1,6 +1,6 @@
 import { TodoistApi } from '@doist/todoist-api-typescript';
-import * as path from 'path';
 import dotenv from 'dotenv';
+import * as path from 'path';
 
 // dotenvで環境変数を読み込む
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -279,7 +279,7 @@ export async function getTasksWithSubtasks(
 
 /**
  * 直接APIからサブタスクを取得する関数
- * @param api - TodoistApiインスタンス 
+ * @param api - TodoistApiインスタンス
  * @param parentId - 親タスクID
  * @returns 親タスクの直下のサブタスク配列
  */
@@ -288,18 +288,18 @@ export async function getSubtasks(
   parentId: string
 ): Promise<TodoistTask[]> {
   console.log(`親タスク(ID: ${parentId})のサブタスクを直接APIから取得します...`);
-  
+
   try {
     // 全タスクを取得
     const allTasks = await getTasks(api);
-    
+
     // 親IDに一致するサブタスクをフィルタリング
     const subtasks = allTasks.filter(task => {
       // parentId、parent_id、parentのいずれかを使用して親子関係を検出
       const taskParentId = task.parentId || task.parent_id || task.parent;
       return taskParentId === parentId;
     });
-    
+
     return subtasks;
   } catch (error) {
     console.error(`サブタスク取得中にエラーが発生しました:`, error);
@@ -320,14 +320,14 @@ export async function getSubtasksRecursive(
   level = 1
 ): Promise<HierarchicalTask[]> {
   console.log(`階層レベル ${level} - 親タスク(ID: ${parentId})のサブタスクを再帰的に取得します...`);
-  
+
   try {
     // 直接のサブタスクを取得
     const directSubtasks = await getSubtasks(api, parentId);
-    
+
     // 階層構造を構築
     const result: HierarchicalTask[] = [];
-    
+
     for (const task of directSubtasks) {
       // 階層タスクの構築
       const hierarchicalTask: HierarchicalTask = {
@@ -337,13 +337,13 @@ export async function getSubtasksRecursive(
         isSubTask: true,
         level: level
       };
-      
+
       // 子タスク（このタスクのサブタスク）を再帰的に取得
       hierarchicalTask.subTasks = await getSubtasksRecursive(api, task.id, level + 1);
-      
+
       result.push(hierarchicalTask);
     }
-    
+
     return result;
   } catch (error) {
     console.error(`再帰的サブタスク取得中にエラーが発生しました:`, error);
@@ -407,7 +407,7 @@ export async function getTodayTasksWithSubtasks(
 
     // 階層構造を持つタスク配列
     const hierarchicalTasks: HierarchicalTask[] = [];
-    
+
     // 今日期限の各タスクを処理
     for (const todayTask of todayTasks) {
       // 親タスクの階層構造を作成
@@ -417,14 +417,14 @@ export async function getTodayTasksWithSubtasks(
         isSubTask: false,
         level: 0
       };
-      
+
       // サブタスクを再帰的に取得して階層構造を構築
       hierarchicalTask.subTasks = await getSubtasksRecursive(api, todayTask.id);
-      
+
       // 結果配列に追加
       hierarchicalTasks.push(hierarchicalTask);
     }
-    
+
     return hierarchicalTasks;
   } catch (error) {
     console.error('getTodayTasksWithSubtasks: エラーが発生しました', error);
