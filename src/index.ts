@@ -8,6 +8,13 @@ import {
   TaskFilter,
   setDebugMode,
   debug } from './lib/todoistClient';
+import {
+  formatTask,
+  displayTasks,
+  TODAY_TASKS_FORMAT,
+  FILTER_RESULT_FORMAT,
+  FormatTaskOptions
+} from './lib/formatters/taskFormatter';
 
 // 環境変数を読み込む
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -105,27 +112,11 @@ async function showTodayTasks(api: any, options: Record<string, string> = {}) {
 
   console.log(`今日のタスク (${todayTasks.length}件):`);
   
-  // 親タスクのみを表示
-  displayTasks(todayTasks);
+  // 今日のタスク表示用フォーマットを使用
+  displayTasks(todayTasks, console.log, TODAY_TASKS_FORMAT);
 }
 
-/**
- * タスク一覧を表示
- */
-function displayTasks(tasks: any[]): void {
-  tasks.forEach((task, index) => {
-    // 優先度を!記号で表示（4が最高優先度）
-    const priority = task.priority ? '!'.repeat(task.priority) : '-';
-    
-    // 完了状態を表示
-    const statusMarker = task.isCompleted ? '✓' : '□';
-    
-    // 期限情報を表示（あれば）
-    const dueInfo = task.due ? `[期限: ${task.due.date}]` : '';
-    
-    console.log(`${index + 1}. ${statusMarker} [${priority}] ${task.content} ${dueInfo}`);
-  });
-}
+// displayTasks関数は formatters/taskFormatter.ts に移動しました
 
 /**
  * 条件でタスクを絞り込んで表示
@@ -171,12 +162,8 @@ async function filterTasks(api: any, options: Record<string, string>) {
 
   console.log(`検索結果 (${tasks.length}件):`);
 
-  // タスク一覧を表示
-  tasks.forEach((task, index) => {
-    const priority = task.priority ? '!'.repeat(task.priority) : '-';
-    const dueDate = task.due ? `(期限: ${task.due.date})` : '';
-    console.log(`${index + 1}. [${priority}] ${task.content} ${dueDate}`);
-  });
+  // フィルタリング結果用のフォーマットを使用
+  displayTasks(tasks, console.log, FILTER_RESULT_FORMAT);
 }
 
 /**

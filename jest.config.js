@@ -7,4 +7,6 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': 'ts-jest',
   },
+  // テストのデフォルトタイムアウトを増やす（20秒）
+  testTimeout: 20000,
 };

@@ -70,8 +70,12 @@ export interface TodoistTask {
   projectId: string;
   parentId?: string | null;
   isCompleted: boolean; // 必須プロパティとして追加
+  priority?: number; // 優先度（1-4）
+  due?: { date: string; }; // 期限
   [key: string]: any; // その他のプロパティを許容
 }
+
+// フォーマット関連機能は formatters/taskFormatter.ts へ移動しました
 
 /**
  * Todoist APIクライアントを作成
