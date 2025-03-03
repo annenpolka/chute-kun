@@ -5,7 +5,9 @@ import {
   createTodoistApi,
   getTodayTasks,
   getTasks,
-  TaskFilter } from './lib/todoistClient';
+  TaskFilter,
+  setDebugMode,
+  debug } from './lib/todoistClient';
 
 // 環境変数を読み込む
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -45,6 +47,15 @@ function parseArgs(): { command: string; options: Record<string, string> } {
 async function main() {
   try {
     const { command, options } = parseArgs();
+
+    // デバッグモードの設定
+    const isDebugMode = options.debug === 'true' || process.env.DEBUG_MODE === 'true';
+    setDebugMode(isDebugMode);
+    
+    // アプリケーション起動メッセージ
+    if (isDebugMode) {
+      console.log('デバッグモード: 有効');
+    }
 
     // 環境変数のデバッグ情報
     console.log('環境変数の状態:');
@@ -167,6 +178,10 @@ function showHelp() {
   filter          条件に合わせてタスクをフィルタリング
   help            このヘルプを表示
 
+オプション (共通):
+  --debug         デバッグ情報を表示 (true/false)
+  --token         Todoist API トークンを直接指定
+
 オプション (filterコマンド用):
   --project       プロジェクトIDで絞り込み
   --labels        ラベルで絞り込み (カンマ区切りで複数指定可)
@@ -174,8 +189,13 @@ function showHelp() {
   --completed     完了状態で絞り込み (true/false)
   --priority      優先度で絞り込み (1-4)
 
+環境変数:
+  TODOIST_API_TOKEN  TodoistのAPIトークン
+  DEBUG_MODE         デバッグモードを有効化 (true/false)
+
 例:
   npx ts-node src/index.ts today
+  npx ts-node src/index.ts today --debug true
   npx ts-node src/index.ts filter --project project123 --due 2025-03-10
   npx ts-node src/index.ts filter --labels label1,label2 --completed false
   `);

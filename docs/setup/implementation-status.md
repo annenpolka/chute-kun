@@ -49,6 +49,7 @@ src/
   - `--priority`: 優先度でフィルタリング（1-4）
 - `help`: 使用方法の表示
 - `--token`: コマンドラインからのTodoist APIトークン指定
+- **`--debug`**: デバッグ情報の表示を制御（true/false）
 
 ### 3. テスト状況 / Testing Status
 
@@ -140,8 +141,9 @@ src/
 TODOIST_API_TOKEN=your_todoist_api_token_here
 
 # アプリケーション設定
-APP_ENV=development  # development, production
-LOG_LEVEL=debug      # debug, info, warn, error
+APP_ENV=development     # development, production
+LOG_LEVEL=debug         # debug, info, warn, error
+DEBUG_MODE=true         # デバッグメッセージを表示するかどうか (true/false)
 ```
 
 ### 実行方法 / Execution Methods
@@ -157,6 +159,13 @@ npm start -- today
 
 # トークン直接指定
 npm run dev -- today --token your_todoist_api_token
+
+# デバッグモード有効
+npm run dev -- today --debug true
+npm run dev -- filter --priority 4 --debug true
+
+# 環境変数でデバッグモード設定
+DEBUG_MODE=true npm run dev -- today
 ```
 
 ## 次のステップ / Next Steps

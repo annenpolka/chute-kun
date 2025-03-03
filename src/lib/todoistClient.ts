@@ -5,6 +5,32 @@ import dotenv from 'dotenv';
 // dotenvで環境変数を読み込む
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+// デバッグモード設定
+let debugMode = process.env.DEBUG_MODE === 'true';
+
+/**
+ * デバッグモードを設定する
+ * @param isDebug - デバッグモードを有効にするかどうか
+ */
+export function setDebugMode(isDebug: boolean): void {
+  debugMode = isDebug;
+}
+
+/**
+ * デバッグメッセージを出力する
+ * @param message - 出力するメッセージ
+ * @param data - 追加のデータ（オプション）
+ */
+export function debug(message: string, data?: any): void {
+  if (debugMode) {
+    if (data !== undefined) {
+      console.log(`[DEBUG] ${message}`, data);
+    } else {
+      console.log(`[DEBUG] ${message}`);
+    }
+  }
+}
+
 /**
  * タスク検索条件のインターフェース
  */
@@ -59,7 +85,7 @@ export function createTodoistApi(apiToken?: string): TodoistApi {
   }
 
   // デバッグ用にトークンの最初の数文字を表示（セキュリティのため全ては表示しない）
-  console.log(`Using API token: ${token.substring(0, 5)}...${token.substring(token.length - 3)}`);
+  debug(`Using API token: ${token.substring(0, 5)}...${token.substring(token.length - 3)}`);
 
   return new TodoistApi(token);
 }
@@ -75,7 +101,8 @@ export async function getTasks(api: TodoistApi | any, filter?: TaskFilter): Prom
     const response = await api.getTasks();
 
     // APIの戻り値を確認
-    console.log('API response type:', typeof response);
+    debug('API response type:', typeof response);
+    debug('API response structure:', response);
 
     // 新しいTodoist APIではレスポンスがオブジェクトで、resultsプロパティに配列がある
     // APIの戻り値を正規化（配列、resultsプロパティ、itemsプロパティのいずれかに対応）
@@ -137,7 +164,8 @@ export async function getTodayTasks(api: TodoistApi | any): Promise<TodoistTask[
   try {
     // 新APIではdueストリングでフィルタできるため、直接取得を試みる
     const response = await api.getTasks({ filter: 'today' });
-    console.log('Using direct today filter');
+    debug('Using direct today filter');
+    debug('Today tasks response:', response);
 
     // APIの戻り値を正規化
     // 配列形式、resultsプロパティ、itemsプロパティのいずれかに対応
