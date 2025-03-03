@@ -34,6 +34,18 @@ src/
   でのフィルタリングをサポート
 - `getTodayTasks()`: 今日期限の未完了タスク取得
 
+#### コマンドラインインターフェース
+
+- `today`: 今日期限のタスク一覧表示
+- `filter`: 条件指定によるタスクフィルタリング
+  - `--project`: プロジェクトIDでフィルタリング
+  - `--labels`: ラベルでフィルタリング（カンマ区切りで複数指定可）
+  - `--due`: 期限日でフィルタリング（YYYY-MM-DD形式）
+  - `--completed`: 完了状態でフィルタリング（true/false）
+  - `--priority`: 優先度でフィルタリング（1-4）
+- `help`: 使用方法の表示
+- `--token`: コマンドラインからのTodoist APIトークン指定
+
 ### 3. テスト状況
 
 - ユニットテスト: 11テストケース（全て成功）
@@ -101,9 +113,42 @@ src/
 1. Todoist APIの型定義の扱いが不完全（any型の使用）
 2. エラーハンドリングの改善が必要
 3. 環境変数管理の強化
+4. 新しいTodoist APIとの互換性調整（レスポンス形式の差異）
+5. APIトークンが無効な場合のエラー表示の改善
+
+## 環境設定
+
+### 環境変数
+`.env` ファイルで以下の設定が可能:
+
+```
+# Todoist API の設定
+TODOIST_API_TOKEN=your_todoist_api_token_here
+
+# アプリケーション設定
+APP_ENV=development  # development, production
+LOG_LEVEL=debug      # debug, info, warn, error
+```
+
+### 実行方法
+
+```bash
+# 開発モード実行
+npm run dev -- today
+npm run dev -- filter --priority 4 --project プロジェクトID
+
+# ビルド実行
+npm run build
+npm start -- today
+
+# トークン直接指定
+npm run dev -- today --token your_todoist_api_token
+```
 
 ## 次のステップ
 
 1. タスクモデルの拡張（所要時間や優先度の追加）
 2. タイムブロックモデルの実装
 3. スケジューリングアルゴリズムの実装
+4. データの永続化（ローカルストレージの実装）
+5. レポート生成機能の追加
