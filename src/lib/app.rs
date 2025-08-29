@@ -1,4 +1,4 @@
-use crate::config::{Config, KeySpec};
+use crate::config::{Config, ESDBase, KeySpec};
 use crate::task::{DayPlan, Task};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::collections::HashMap;
@@ -52,11 +52,8 @@ impl KeyMap {
 
     fn bind(&mut self, spec: KeySpec, action: KeyAction) {
         // remove any existing binding for this action
-        let to_remove: Vec<KeySpec> = self
-            .0
-            .iter()
-            .filter_map(|(k, v)| if *v == action { Some(*k) } else { None })
-            .collect();
+        let to_remove: Vec<KeySpec> =
+            self.0.iter().filter_map(|(k, v)| if *v == action { Some(*k) } else { None }).collect();
         for k in to_remove {
             self.0.remove(&k);
         }
@@ -131,19 +128,45 @@ impl App {
     fn apply_config_keys(map: &mut KeyMap, cfg: &Config) {
         use KeyAction::*;
         let maybe = |name: &str| cfg.key_for(name);
-        if let Some(s) = maybe("quit") { map.bind(s, Quit) }
-        if let Some(s) = maybe("interrupt") { map.bind(s, Interrupt) }
-        if let Some(s) = maybe("start_resume") { map.bind(s, StartOrResume) }
-        if let Some(s) = maybe("pause") { map.bind(s, PauseActive) }
-        if let Some(s) = maybe("reorder_down") { map.bind(s, ReorderDown) }
-        if let Some(s) = maybe("reorder_up") { map.bind(s, ReorderUp) }
-        if let Some(s) = maybe("increase_estimate") { map.bind(s, IncreaseEstimate) }
-        if let Some(s) = maybe("postpone") { map.bind(s, Postpone) }
-        if let Some(s) = maybe("next_view") { map.bind(s, NextView) }
-        if let Some(s) = maybe("prev_view") { map.bind(s, PrevView) }
-        if let Some(s) = maybe("select_up") { map.bind(s, SelectUp) }
-        if let Some(s) = maybe("select_down") { map.bind(s, SelectDown) }
-        if let Some(s) = maybe("finish_active") { map.bind(s, FinishActive) }
+        if let Some(s) = maybe("quit") {
+            map.bind(s, Quit)
+        }
+        if let Some(s) = maybe("interrupt") {
+            map.bind(s, Interrupt)
+        }
+        if let Some(s) = maybe("start_resume") {
+            map.bind(s, StartOrResume)
+        }
+        if let Some(s) = maybe("pause") {
+            map.bind(s, PauseActive)
+        }
+        if let Some(s) = maybe("reorder_down") {
+            map.bind(s, ReorderDown)
+        }
+        if let Some(s) = maybe("reorder_up") {
+            map.bind(s, ReorderUp)
+        }
+        if let Some(s) = maybe("increase_estimate") {
+            map.bind(s, IncreaseEstimate)
+        }
+        if let Some(s) = maybe("postpone") {
+            map.bind(s, Postpone)
+        }
+        if let Some(s) = maybe("next_view") {
+            map.bind(s, NextView)
+        }
+        if let Some(s) = maybe("prev_view") {
+            map.bind(s, PrevView)
+        }
+        if let Some(s) = maybe("select_up") {
+            map.bind(s, SelectUp)
+        }
+        if let Some(s) = maybe("select_down") {
+            map.bind(s, SelectDown)
+        }
+        if let Some(s) = maybe("finish_active") {
+            map.bind(s, FinishActive)
+        }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
@@ -288,6 +311,13 @@ impl App {
 
     pub fn schedule_start_minute_from(&self, now_min: u16) -> u16 {
         self.config.start_of_day_min.unwrap_or(now_min)
+    }
+
+    pub fn esd_base_minute_from(&self, now_min: u16) -> u16 {
+        match (self.config.esd_base, self.config.start_of_day_min) {
+            (ESDBase::StartOfDay, Some(min)) => min,
+            _ => now_min,
+        }
     }
 
     fn set_view(&mut self, v: View) {

@@ -117,7 +117,8 @@ fn state_icon(state: TaskState) -> &'static str {
 
 pub fn format_header_line(now_min: u16, app: &App) -> String {
     let _remaining = app.day.remaining_total_min();
-    let esd_min = app.day.esd(now_min);
+    let base_min = app.esd_base_minute_from(now_min);
+    let esd_min = app.day.esd(base_min);
     let esd_h = esd_min / 60;
     let esd_m = esd_min % 60;
 

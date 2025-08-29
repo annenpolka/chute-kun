@@ -70,17 +70,26 @@ pub struct ConfigToml {
     pub start_of_day: Option<String>,
     #[serde(default)]
     pub keys: Option<HashMap<String, String>>, // action -> key string
+    #[serde(default)]
+    pub esd_base: Option<String>, // "now" | "start_of_day"
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ESDBase {
+    Now,
+    StartOfDay,
 }
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub start_of_day_min: Option<u16>,
     pub keys: HashMap<String, KeySpec>,
+    pub esd_base: ESDBase,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { start_of_day_min: None, keys: HashMap::new() }
+        Self { start_of_day_min: None, keys: HashMap::new(), esd_base: ESDBase::Now }
     }
 }
 
@@ -102,6 +111,11 @@ impl Config {
                 if let Some(spec) = parse_key_spec(&keystr) {
                     cfg.keys.insert(action, spec);
                 }
+            }
+        }
+        if let Some(esd) = raw.esd_base.as_deref() {
+            if let Some(v) = parse_esd_base(esd) {
+                cfg.esd_base = v;
             }
         }
         Ok(cfg)
@@ -139,7 +153,11 @@ fn parse_hhmm_to_min(s: &str) -> Option<u16> {
     }
     let h: u16 = parts[0].parse().ok()?;
     let m: u16 = parts[1].parse().ok()?;
-    if h < 24 && m < 60 { Some(h * 60 + m) } else { None }
+    if h < 24 && m < 60 {
+        Some(h * 60 + m)
+    } else {
+        None
+    }
 }
 
 fn parse_key_spec(s: &str) -> Option<KeySpec> {
@@ -178,4 +196,12 @@ fn parse_key_spec(s: &str) -> Option<KeySpec> {
         }
     };
     Some(KeySpec { code, modifiers })
+}
+
+fn parse_esd_base(s: &str) -> Option<ESDBase> {
+    match s.trim().to_lowercase().as_str() {
+        "now" => Some(ESDBase::Now),
+        "start_of_day" | "start-of-day" => Some(ESDBase::StartOfDay),
+        _ => None,
+    }
 }
