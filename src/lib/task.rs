@@ -33,6 +33,11 @@ impl DayPlan {
 
     pub fn active_index(&self) -> Option<usize> { self.active }
 
+    pub fn add_task(&mut self, task: Task) -> usize {
+        self.tasks.push(task);
+        self.tasks.len() - 1
+    }
+
     // start or activate a task at index, pausing any existing active task
     pub fn start(&mut self, index: usize) {
         if let Some(cur) = self.active {
@@ -57,4 +62,3 @@ pub fn esd_from(now_min: u16, remaining_mins: &[u16]) -> u16 {
     let sum: u16 = remaining_mins.iter().copied().sum();
     now_min.saturating_add(sum)
 }
-
