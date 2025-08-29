@@ -5,7 +5,7 @@ use ratatui::{
 };
 
 use crate::app::{App, View};
-use crate::clock::system_now_minutes;
+use crate::clock::{system_now_minutes, Clock};
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
@@ -32,6 +32,33 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     // Main list content
     let lines = format_task_lines(app).join("\n");
+    let para = Paragraph::new(lines);
+    f.render_widget(para, chunks[1]);
+}
+
+/// Like `draw`, but uses an injected `Clock` for current time.
+pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
+    let area: Rect = f.size();
+    let now = clock.now_minutes();
+    let header = format_header_line(now, app);
+    let block = Block::default().title(header).borders(Borders::ALL);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    let (titles, selected) = tab_titles(app);
+    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
+    let tabs = Tabs::new(titles)
+        .select(selected)
+        .highlight_style(Style::default().fg(Color::Yellow))
+        .divider(Span::raw("│"));
+    f.render_widget(tabs, chunks[0]);
+
+    let lines = format_task_lines_at(now, app).join("\n");
     let para = Paragraph::new(lines);
     f.render_widget(para, chunks[1]);
 }
