@@ -48,26 +48,52 @@ pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
+    format_task_lines_at(local_minutes(), app)
+}
+
+// Deterministic variant for tests: inject current minutes since midnight.
+pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
     match app.view() {
-        View::Past => render_list_slice(app, app.history_tasks()),
-        View::Today => render_list_slice(app, &app.day.tasks),
-        View::Future => render_list_slice(app, app.tomorrow_tasks()),
+        View::Past => render_list_slice(now_min, app, app.history_tasks()),
+        View::Today => render_list_slice(now_min, app, &app.day.tasks),
+        View::Future => render_list_slice(now_min, app, app.tomorrow_tasks()),
     }
 }
 
-fn render_list_slice(app: &App, tasks: &[crate::task::Task]) -> Vec<String> {
+fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Vec<String> {
     if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
     let active_idx = app.day.active_index();
+
+    // Build schedule start times from `now_min`, adding remaining durations of preceding tasks.
+    let mut cursor = now_min;
+    let starts: Vec<u16> = tasks
+        .iter()
+        .map(|t| {
+            let this = cursor;
+            // remaining minutes for this task (ignoring partial seconds for simplicity)
+            let remaining = match t.state {
+                TaskState::Done => 0,
+                _ => t.estimate_min.saturating_sub(t.actual_min),
+            };
+            cursor = cursor.saturating_add(remaining);
+            this
+        })
+        .collect();
+
     tasks
         .iter()
         .enumerate()
         .map(|(i, t)| {
             let sel = if i == app.selected_index() { "▶" } else { " " };
             let secs = if active_idx == Some(i) { app.active_carry_seconds() } else { 0 };
+            let hh = (starts[i] / 60) % 24;
+            let mm = starts[i] % 60;
             format!(
-                "{} {} {} (est:{}m act:{}m {}s)",
+                "{:02}:{:02} {} {} {} (est:{}m act:{}m {}s)",
+                hh,
+                mm,
                 sel,
                 state_icon(t.state),
                 t.title,
