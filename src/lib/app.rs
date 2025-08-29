@@ -101,6 +101,8 @@ impl App {
             }
             KeyCode::Up => self.select_up(),
             KeyCode::Down => self.select_down(),
+            KeyCode::Char('k') => self.select_up(),
+            KeyCode::Char('j') => self.select_down(),
             _ => {}
         }
     }
@@ -131,12 +133,14 @@ impl App {
 
     pub fn selected_index(&self) -> usize { self.selected }
     pub fn select_up(&mut self) {
-        if self.day.tasks.is_empty() { return; }
+        let len = self.current_len();
+        if len == 0 { return; }
         self.selected = self.selected.saturating_sub(1);
     }
     pub fn select_down(&mut self) {
-        if self.day.tasks.is_empty() { return; }
-        let last = self.day.tasks.len() - 1;
+        let len = self.current_len();
+        if len == 0 { return; }
+        let last = len - 1;
         self.selected = (self.selected + 1).min(last);
     }
 
