@@ -1,0 +1,60 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskState {
+    Planned,
+    Active,
+    Paused,
+    Done,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Task {
+    pub title: String,
+    pub estimate_min: u16,
+    pub state: TaskState,
+}
+
+impl Task {
+    pub fn new(title: &str, estimate_min: u16) -> Self {
+        Self { title: title.to_string(), estimate_min, state: TaskState::Planned }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DayPlan {
+    pub tasks: Vec<Task>,
+    active: Option<usize>,
+}
+
+impl DayPlan {
+    pub fn new(tasks: Vec<Task>) -> Self {
+        let active = tasks.iter().position(|t| matches!(t.state, TaskState::Active));
+        Self { tasks, active }
+    }
+
+    pub fn active_index(&self) -> Option<usize> { self.active }
+
+    // start or activate a task at index, pausing any existing active task
+    pub fn start(&mut self, index: usize) {
+        if let Some(cur) = self.active {
+            if cur != index {
+                if let Some(t) = self.tasks.get_mut(cur) {
+                    t.state = TaskState::Paused;
+                }
+            } else {
+                // already active, nothing to do
+                return;
+            }
+        }
+        if let Some(t) = self.tasks.get_mut(index) {
+            t.state = TaskState::Active;
+            self.active = Some(index);
+        }
+    }
+}
+
+// ESD(見込み終了時刻) = now(min) + 残分合計
+pub fn esd_from(now_min: u16, remaining_mins: &[u16]) -> u16 {
+    let sum: u16 = remaining_mins.iter().copied().sum();
+    now_min.saturating_add(sum)
+}
+
