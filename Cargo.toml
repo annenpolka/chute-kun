@@ -1,0 +1,24 @@
+[package]
+name = "chute_kun"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "TaskChute + Todoist CLI/TUI — Rust TUI template using ratatui + crossterm"
+repository = "https://example.com/placeholder"
+
+[dependencies]
+anyhow = "1"
+color-eyre = "0.6"
+crossterm = "0.27"
+ratatui = "0.26"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+
+[dev-dependencies]
+# keep same versions available to tests
+ratatui = "0.26"
+crossterm = "0.27"
+
+[[bin]]
+name = "chute_kun"
+path = "src/cli/main.rs"

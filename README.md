@@ -14,6 +14,26 @@ TaskChute の考え方を Todoist API と連携し、コマンドラインから
 - **時間管理** - タスクの所要時間計測と予測（開発中）
 - **タイムブロック生成** - 最適なスケジュール提案（開発中）
 
+## Rust TUI テンプレート（ratatui + crossterm）
+
+このリポジトリには Rust 製 TUI の最小テンプレートが含まれます。
+
+- エントリポイント: `src/cli/main.rs`
+- 再利用ロジック: `src/lib/`
+- テスト: `tests/`（`cargo test` を使用。追加の scripts は不要）
+
+実行:
+
+```
+cargo run
+```
+
+テスト:
+
+```
+cargo test
+```
+
 ## ライセンス
 
 MIT
@@ -25,4 +45,3 @@ MIT
 - [システム概要](docs/system-overview.md)
 - [実装状況](docs/setup/implementation-status.md)
 - [開発計画](docs/planning/development-plan.md)
-
