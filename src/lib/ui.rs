@@ -57,7 +57,8 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     let esd_m = esd_min % 60;
     let total_est: u16 = app.day.tasks.iter().map(|t| t.estimate_min).sum();
     let total_act: u16 = app.day.tasks.iter().map(|t| t.actual_min).sum();
-    format!("ESD {:02}:{:02} | Est {}m | Act {}m", esd_h, esd_m, total_est - total_act, total_act)
+    let view = match app.view() { crate::app::View::Past => "Past", crate::app::View::Today => "Today", crate::app::View::Future => "Future" };
+    format!("ESD {:02}:{:02} | Est {}m | Act {}m | View: {}", esd_h, esd_m, total_est - total_act, total_act, view)
 }
 
 fn local_minutes() -> u16 {

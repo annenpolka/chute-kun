@@ -27,7 +27,8 @@ fn enter_space_shiftenter_transitions() {
     // so we simulate Finish via a dedicated method later; for now we call a special code path by sending `KeyCode::Null` is not ideal.
     // To keep the test executable, we will add a helper on App to finish_active() and call it here.
     app.finish_active();
-    assert_eq!(app.day.tasks[0].state, TaskState::Done);
     assert_eq!(app.day.active_index(), None);
+    assert_eq!(app.day.tasks.len(), 0);
+    assert_eq!(app.history_tasks().len(), 1);
+    assert_eq!(app.history_tasks()[0].state, TaskState::Done);
 }
-

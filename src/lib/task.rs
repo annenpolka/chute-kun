@@ -136,3 +136,13 @@ pub fn esd_from(now_min: u16, remaining_mins: &[u16]) -> u16 {
     let sum: u16 = remaining_mins.iter().copied().sum();
     now_min.saturating_add(sum)
 }
+
+pub fn tc_log_line(task: &Task) -> String {
+    let state = match task.state {
+        TaskState::Planned => "Planned",
+        TaskState::Active => "Active",
+        TaskState::Paused => "Paused",
+        TaskState::Done => "Done",
+    };
+    format!("tc-log | {} | act:{}m | est:{}m | state:{}", task.title, task.actual_min, task.estimate_min, state)
+}

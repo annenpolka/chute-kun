@@ -11,7 +11,8 @@ fn shift_enter_finishes_active() {
 
     let ev = KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT);
     app.handle_key_event(ev);
-    assert_eq!(app.day.tasks[0].state, TaskState::Done);
     assert_eq!(app.day.active_index(), None);
+    assert_eq!(app.day.tasks.len(), 0);
+    assert_eq!(app.history_tasks().len(), 1);
+    assert_eq!(app.history_tasks()[0].state, TaskState::Done);
 }
-
