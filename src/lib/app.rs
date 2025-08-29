@@ -36,6 +36,19 @@ pub struct App {
     history: Vec<Task>,
     view: View,
     active_accum_sec: u16,
+    input: Option<Input>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputKind {
+    Normal,
+    Interrupt,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Input {
+    kind: InputKind,
+    buffer: String,
 }
 
 impl App {
@@ -49,21 +62,52 @@ impl App {
             history: vec![],
             view: View::default(),
             active_accum_sec: 0,
+            input: None,
         }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
+        // If we are in input mode, interpret keys as text editing/submit/cancel
+        if let Some(input) = self.input.as_mut() {
+            match code {
+                KeyCode::Enter => {
+                    let (default_title, est) = match input.kind {
+                        InputKind::Normal => ("New Task", 25u16),
+                        InputKind::Interrupt => ("Interrupt", 15u16),
+                    };
+                    let title = if input.buffer.trim().is_empty() {
+                        default_title.to_string()
+                    } else {
+                        input.buffer.trim().to_string()
+                    };
+                    let idx = self.add_task(&title, est);
+                    self.selected = idx;
+                    self.input = None;
+                }
+                KeyCode::Esc => {
+                    self.input = None;
+                }
+                KeyCode::Backspace => {
+                    input.buffer.pop();
+                }
+                KeyCode::Char(c) => {
+                    input.buffer.push(c);
+                }
+                _ => {}
+            }
+            return;
+        }
         match code {
             KeyCode::Char('q') => {
                 self.should_quit = true;
             }
             KeyCode::Char('i') => {
-                // Create a normal (non-interrupt) task as planned, no auto-start
-                let _idx = self.add_task("New Task", 25);
+                // Enter input mode for a normal task
+                self.input = Some(Input { kind: InputKind::Normal, buffer: String::new() });
             }
             KeyCode::Char('I') => {
-                // Create an interrupt task without auto-starting it
-                let _idx = self.add_task("Interrupt", 15);
+                // Enter input mode for an interrupt task
+                self.input = Some(Input { kind: InputKind::Interrupt, buffer: String::new() });
             }
             KeyCode::Enter => {
                 // If nothing active, start/resume the selected if eligible; else first eligible.
@@ -191,6 +235,14 @@ impl App {
 
     pub fn active_carry_seconds(&self) -> u16 {
         self.active_accum_sec
+    }
+
+    // Input mode helpers for UI/tests
+    pub fn in_input_mode(&self) -> bool {
+        self.input.is_some()
+    }
+    pub fn input_buffer(&self) -> Option<&str> {
+        self.input.as_ref().map(|i| i.buffer.as_str())
     }
 
     fn set_view(&mut self, v: View) {
