@@ -34,7 +34,6 @@ pub struct App {
     tomorrow: Vec<Task>,
     history: Vec<Task>,
     view: View,
-    active_accum_sec: u16,
 }
 
 impl App {
@@ -47,7 +46,6 @@ impl App {
             tomorrow: vec![],
             history: vec![],
             view: View::default(),
-            active_accum_sec: 0,
         }
     }
 
@@ -59,7 +57,6 @@ impl App {
             KeyCode::Char('i') => {
                 let idx = self.add_task("Interrupt", 15);
                 self.day.start(idx);
-                self.active_accum_sec = 0;
             }
             KeyCode::Enter => {
                 // If nothing active, start/resume the selected if eligible; else first eligible.
@@ -68,11 +65,9 @@ impl App {
                     let eligible = matches!(self.day.tasks.get(s).map(|t| t.state), Some(crate::task::TaskState::Paused | crate::task::TaskState::Planned));
                     if eligible {
                         self.day.start(s);
-                        self.active_accum_sec = 0;
                     } else if let Some(idx) = (0..self.day.tasks.len()).find(|&i| matches!(self.day.tasks[i].state, crate::task::TaskState::Paused | crate::task::TaskState::Planned)) {
                         self.day.start(idx);
                         self.selected = idx;
-                        self.active_accum_sec = 0;
                     }
                 }
             }
@@ -180,12 +175,10 @@ impl App {
 
     pub fn tick(&mut self, seconds: u16) {
         if let Some(active) = self.day.active_index() {
-            self.active_accum_sec = self.active_accum_sec.saturating_add(seconds);
-            while self.active_accum_sec >= 60 {
-                self.active_accum_sec -= 60;
-                if let Some(t) = self.day.tasks.get_mut(active) {
-                    t.actual_min = t.actual_min.saturating_add(1);
-                }
+            if let Some(t) = self.day.tasks.get_mut(active) {
+                let mut total_sec = t.actual_sec.saturating_add(seconds);
+                t.actual_min = t.actual_min.saturating_add(total_sec / 60);
+                t.actual_sec = total_sec % 60;
             }
         }
     }

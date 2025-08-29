@@ -9,6 +9,6 @@ fn header_shows_esd_and_totals() {
     let s = format_header_line(now, &app);
     assert!(s.contains("ESD 10:30"));
     assert!(s.contains("Est 90m"));
-    assert!(s.contains("Act 0m"));
+    assert!(s.contains("Act 0m 0s"));
     assert!(s.contains("View: Today"));
 }

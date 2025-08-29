@@ -2,18 +2,19 @@
 
 ## サマリ
 - スタック: Rust + `ratatui 0.26`（UI）, `crossterm 0.27`（端末制御）
-- 進捗: 最小のTUIテンプレートを実装（描画・イベントループ・`q` で終了）
-- テスト: Cargo 標準のテストランナーでユニット/描画スモークを実行
+- 進捗: タスク追加/選択/開始・一時停止・完了、翌日送り、並べ替え、履歴ビュー、ESD/ヘッダ表示を実装。
+- 実績時間: 秒単位の計測を導入（ループで経過ミリ秒→秒へ集約）。各タスクに秒を保持し、60秒で分に繰上げ。Pause→Resumeでも部分秒は保持。
+- テスト: ユニット/レンダリングスモークに加え、`tick` の秒→分繰上げ、停止→再開時の部分秒リセットを検証。
 - スクリプト: なし（`cargo run` / `cargo test` を利用）
 
 ## 実行・テスト
-- 実行: `cargo run`（`q` で終了）
+- 実行: `cargo run`（`Enter` で開始、`Space` 一時停止、`Shift+Enter` 完了、`p` 翌日送り、`q` 終了）
 - テスト: `cargo test`
 
 ## 主要ファイル
-- `src/cli/main.rs`: 端末初期化/終了、描画ループ、入力ポーリング
-- `src/lib/app.rs`: アプリ状態（`title`, `should_quit`）と `handle_key`
-- `src/lib/ui.rs`: 単一の枠ウィジェットを描画（タイトルは状態から）
+- `src/cli/main.rs`: 端末初期化/終了、描画ループ、入力ポーリング、秒単位 `tick` 呼び出し
+- `src/lib/app.rs`: アプリ状態、キー操作、`tick(seconds)` による実績加算（60秒で1分）
+- `src/lib/ui.rs`: ヘッダ（ESD/Est/Act/View）とタスクリスト描画
 - `src/lib.rs`: 上記モジュールのエクスポート（パス指定）
 
 ## 依存関係
@@ -34,15 +35,11 @@
 - 終了: `App::handle_key` が `q` を受け取り `should_quit = true`
 
 ## 未実装（バックログ）
-- UI: リスト/テーブル/詳細ペイン、レイアウト、ステータスライン
-- 入力: Start/Pause/Resume/Finish 他のキーバインド
-- ドメイン: 見積/実績・ESD 計算、セッションモデル
-- 同期: Todoist API 連携（取得/更新/完了の反映）
-- 設定: 環境変数/設定ファイルの読込
-- テスト: レンダリングバッファのアサート、ドメインの境界ケース
+- UI: 詳細ペイン/セッション一覧/レイアウト強化
+- ドメイン: Todoist 同期、設定読取
+- テスト: レンダリングバッファ直接アサート、境界ケースの充実
 
 ## 参照
 - ADR-003: Rust製TUIライブラリ選定（ratatui + crossterm 採用）
 - `docs/features/tui-testlist-v1.md`（TDD用テストリスト）
 - `docs/features/tui-app-spec-v1.md`（MVP仕様）
-
