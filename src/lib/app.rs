@@ -58,9 +58,8 @@ impl App {
                 self.should_quit = true;
             }
             KeyCode::Char('i') => {
-                let idx = self.add_task("Interrupt", 15);
-                self.day.start(idx);
-                self.active_accum_sec = 0;
+                // Create an interrupt task without auto-starting it
+                let _idx = self.add_task("Interrupt", 15);
             }
             KeyCode::Enter => {
                 // If nothing active, start/resume the selected if eligible; else first eligible.

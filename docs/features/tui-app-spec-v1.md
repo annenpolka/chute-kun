@@ -25,7 +25,7 @@
 - Reorder: `Alt+↑/↓`（または `[`/`]`）
 - Edit Estimate: `e`（数値分）
 - Postpone(持越し): `p`（翌日へ/日時指定）
-- Interrupt(割込作成&開始): `i`
+- Interrupt(割込作成のみ。開始は `Enter`): `i`
 - Split(分割): `s`
 - Toggle Detail: `d`
 - Filter/Search: `/`
