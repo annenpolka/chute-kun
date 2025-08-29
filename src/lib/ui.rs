@@ -39,7 +39,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     // Help line at the bottom
     if chunks.len() >= 3 && chunks[2].height > 0 {
-        let help = Paragraph::new(format_help_line()).style(Style::default().fg(Color::DarkGray));
+        let help = Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
         f.render_widget(help, chunks[2]);
     }
 }
@@ -161,4 +161,21 @@ pub fn format_help_line() -> String {
     // Group by intent: lifecycle, edit, navigate, quit.
     // Keep tokens like "Shift+Enter" and brackets to make tests and user scanning easy.
     "Enter: start/resume  Shift+Enter: finish  Space: pause  i: interrupt  e: +5m  [: up  ]: down  p: postpone  Tab: next  Shift+Tab: prev  q: quit".to_string()
+}
+
+// Contextual help: optimize content for current view.
+pub fn format_help_line_for(app: &App) -> String {
+    match app.view() {
+        View::Today => {
+            // Keep full actionable help on Today where operations are valid.
+            format!(
+                "{}  j/k,↑/↓: move",
+                format_help_line()
+            )
+        }
+        View::Future | View::Past => {
+            // Limit to navigation/quit; lifecycle and edit ops are not applicable in these views.
+            "j/k,↑/↓: move  Tab: next  Shift+Tab: prev  q: quit".to_string()
+        }
+    }
 }
