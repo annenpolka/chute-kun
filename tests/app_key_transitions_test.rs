@@ -1,6 +1,6 @@
-use crossterm::event::{KeyCode, KeyModifiers};
 use chute_kun::app::App;
 use chute_kun::task::TaskState;
+use crossterm::event::KeyCode;
 
 #[test]
 fn enter_space_shiftenter_transitions() {

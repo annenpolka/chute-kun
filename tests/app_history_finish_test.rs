@@ -1,6 +1,6 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use chute_kun::app::{App, View};
 use chute_kun::task::TaskState;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[test]
 fn finish_moves_task_to_history_and_today_drops_it() {
@@ -24,4 +24,3 @@ fn finish_moves_task_to_history_and_today_drops_it() {
     app.handle_key(KeyCode::BackTab); // Today -> Past
     assert_eq!(app.view(), View::Past);
 }
-

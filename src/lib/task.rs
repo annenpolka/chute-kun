@@ -32,7 +32,9 @@ impl DayPlan {
         Self { tasks, active }
     }
 
-    pub fn active_index(&self) -> Option<usize> { self.active }
+    pub fn active_index(&self) -> Option<usize> {
+        self.active
+    }
 
     pub fn add_task(&mut self, task: Task) -> usize {
         self.tasks.push(task);
@@ -82,30 +84,45 @@ impl DayPlan {
     }
 
     pub fn remaining_total_min(&self) -> u16 {
-        self.tasks.iter().map(|t| match t.state {
-            TaskState::Done => 0,
-            _ => t.estimate_min.saturating_sub(t.actual_min),
-        }).sum()
+        self.tasks
+            .iter()
+            .map(|t| match t.state {
+                TaskState::Done => 0,
+                _ => t.estimate_min.saturating_sub(t.actual_min),
+            })
+            .sum()
     }
 
-    pub fn esd(&self, now_min: u16) -> u16 { esd_from(now_min, &[self.remaining_total_min()]) }
+    pub fn esd(&self, now_min: u16) -> u16 {
+        esd_from(now_min, &[self.remaining_total_min()])
+    }
 
     pub fn reorder_down(&mut self, index: usize) -> usize {
-        if index + 1 >= self.tasks.len() { return index; }
+        if index + 1 >= self.tasks.len() {
+            return index;
+        }
         self.tasks.swap(index, index + 1);
         if let Some(a) = self.active.as_mut() {
-            if *a == index { *a = index + 1; }
-            else if *a == index + 1 { *a = index; }
+            if *a == index {
+                *a = index + 1;
+            } else if *a == index + 1 {
+                *a = index;
+            }
         }
         index + 1
     }
 
     pub fn reorder_up(&mut self, index: usize) -> usize {
-        if index == 0 || index >= self.tasks.len() { return index; }
+        if index == 0 || index >= self.tasks.len() {
+            return index;
+        }
         self.tasks.swap(index - 1, index);
         if let Some(a) = self.active.as_mut() {
-            if *a == index { *a = index - 1; }
-            else if *a == index - 1 { *a = index; }
+            if *a == index {
+                *a = index - 1;
+            } else if *a == index - 1 {
+                *a = index;
+            }
         }
         index - 1
     }
@@ -118,7 +135,9 @@ impl DayPlan {
     }
 
     pub fn remove(&mut self, index: usize) -> Option<Task> {
-        if index >= self.tasks.len() { return None; }
+        if index >= self.tasks.len() {
+            return None;
+        }
         // fix active pointer
         if let Some(a) = self.active {
             if a == index {
@@ -144,5 +163,8 @@ pub fn tc_log_line(task: &Task) -> String {
         TaskState::Paused => "Paused",
         TaskState::Done => "Done",
     };
-    format!("tc-log | {} | act:{}m | est:{}m | state:{}", task.title, task.actual_min, task.estimate_min, state)
+    format!(
+        "tc-log | {} | act:{}m | est:{}m | state:{}",
+        task.title, task.actual_min, task.estimate_min, state
+    )
 }

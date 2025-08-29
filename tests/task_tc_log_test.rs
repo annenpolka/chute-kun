@@ -1,4 +1,4 @@
-use chute_kun::task::{Task, TaskState, tc_log_line};
+use chute_kun::task::{tc_log_line, Task, TaskState};
 
 #[test]
 fn tc_log_line_has_minimal_fields() {
@@ -12,4 +12,3 @@ fn tc_log_line_has_minimal_fields() {
     assert!(s.contains("est:30m"));
     assert!(s.contains("state:Done"));
 }
-

@@ -1,5 +1,5 @@
-use chute_kun::{app::App, task::Task};
 use chute_kun::ui::format_task_lines;
+use chute_kun::app::App;
 
 #[test]
 fn shows_hint_when_no_tasks_then_title_after_add() {
@@ -11,4 +11,3 @@ fn shows_hint_when_no_tasks_then_title_after_add() {
     let lines = format_task_lines(&app);
     assert!(lines.iter().any(|l| l.contains("Hello")));
 }
-

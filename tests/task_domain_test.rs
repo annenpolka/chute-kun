@@ -1,5 +1,5 @@
-use chute_kun::task::{DayPlan, Task, TaskState};
 use chute_kun::task::esd_from;
+use chute_kun::task::{DayPlan, Task, TaskState};
 
 // 単体: ESD計算（now=09:00, 残=30+60+15 => 10:45）
 #[test]
@@ -13,10 +13,7 @@ fn esd_calc_simple_sum() {
 // 単体: アクティブ単一性
 #[test]
 fn only_one_active_task_at_a_time() {
-    let mut day = DayPlan::new(vec![
-        Task::new("A", 30),
-        Task::new("B", 60),
-    ]);
+    let mut day = DayPlan::new(vec![Task::new("A", 30), Task::new("B", 60)]);
 
     // start A
     day.start(0);
@@ -29,4 +26,3 @@ fn only_one_active_task_at_a_time() {
     assert_eq!(day.tasks[1].state, TaskState::Active);
     assert_eq!(day.active_index(), Some(1));
 }
-

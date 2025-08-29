@@ -1,5 +1,5 @@
-use crossterm::event::KeyCode;
 use chute_kun::app::App;
+use crossterm::event::KeyCode;
 
 // Red: j/k should navigate selection like Down/Up
 #[test]
@@ -30,4 +30,3 @@ fn vim_keys_move_selection_up_down() {
     app.handle_key(KeyCode::Char('k'));
     assert_eq!(app.selected_index(), 0);
 }
-

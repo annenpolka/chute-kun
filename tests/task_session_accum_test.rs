@@ -20,4 +20,3 @@ fn add_actual_without_active_is_noop() {
     day.add_actual_to_active(5);
     assert_eq!(day.tasks[0].actual_min, 0);
 }
-

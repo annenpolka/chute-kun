@@ -1,11 +1,12 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::task::{DayPlan, Task};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum View { Past, Today, Future }
-
-impl Default for View {
-    fn default() -> Self { View::Today }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum View {
+    Past,
+    #[default]
+    Today,
+    Future,
 }
 
 impl View {
@@ -65,10 +66,18 @@ impl App {
                 // If nothing active, start/resume the selected if eligible; else first eligible.
                 if self.day.active_index().is_none() {
                     let s = self.selected;
-                    let eligible = matches!(self.day.tasks.get(s).map(|t| t.state), Some(crate::task::TaskState::Paused | crate::task::TaskState::Planned));
+                    let eligible = matches!(
+                        self.day.tasks.get(s).map(|t| t.state),
+                        Some(crate::task::TaskState::Paused | crate::task::TaskState::Planned)
+                    );
                     if eligible {
                         self.day.start(s);
-                    } else if let Some(idx) = (0..self.day.tasks.len()).find(|&i| matches!(self.day.tasks[i].state, crate::task::TaskState::Paused | crate::task::TaskState::Planned)) {
+                    } else if let Some(idx) = (0..self.day.tasks.len()).find(|&i| {
+                        matches!(
+                            self.day.tasks[i].state,
+                            crate::task::TaskState::Paused | crate::task::TaskState::Planned
+                        )
+                    }) {
                         self.day.start(idx);
                         self.selected = idx;
                     }
@@ -119,31 +128,41 @@ impl App {
 
     pub fn finish_active(&mut self) {
         // mark done
-        let before_len = self.day.tasks.len();
+        let _before_len = self.day.tasks.len();
         self.day.finish_active();
         // move done (former active) to history if exists
-        if let Some(pos) = (0..self.day.tasks.len()).find(|&i| matches!(self.day.tasks[i].state, crate::task::TaskState::Done)) {
+        if let Some(pos) = (0..self.day.tasks.len())
+            .find(|&i| matches!(self.day.tasks[i].state, crate::task::TaskState::Done))
+        {
             if let Some(task) = self.day.remove(pos) {
                 self.history.push(task);
             }
         }
     }
 
-    pub fn selected_index(&self) -> usize { self.selected }
+    pub fn selected_index(&self) -> usize {
+        self.selected
+    }
     pub fn select_up(&mut self) {
         let len = self.current_len();
-        if len == 0 { return; }
+        if len == 0 {
+            return;
+        }
         self.selected = self.selected.saturating_sub(1);
     }
     pub fn select_down(&mut self) {
         let len = self.current_len();
-        if len == 0 { return; }
+        if len == 0 {
+            return;
+        }
         let last = len - 1;
         self.selected = (self.selected + 1).min(last);
     }
 
     pub fn postpone_selected(&mut self) {
-        if self.day.tasks.is_empty() { return; }
+        if self.day.tasks.is_empty() {
+            return;
+        }
         let idx = self.selected.min(self.day.tasks.len() - 1);
         if let Some(task) = self.day.remove(idx) {
             // stay planned for tomorrow
@@ -156,18 +175,30 @@ impl App {
         }
     }
 
-    pub fn tomorrow_tasks(&self) -> &Vec<Task> { &self.tomorrow }
-    pub fn history_tasks(&self) -> &Vec<Task> { &self.history }
+    pub fn tomorrow_tasks(&self) -> &Vec<Task> {
+        &self.tomorrow
+    }
+    pub fn history_tasks(&self) -> &Vec<Task> {
+        &self.history
+    }
 
-    pub fn view(&self) -> View { self.view }
+    pub fn view(&self) -> View {
+        self.view
+    }
 
-    pub fn active_carry_seconds(&self) -> u16 { self.active_accum_sec }
+    pub fn active_carry_seconds(&self) -> u16 {
+        self.active_accum_sec
+    }
 
     fn set_view(&mut self, v: View) {
         self.view = v;
         // clamp selection to current view length
         let len = self.current_len();
-        if len == 0 { self.selected = 0; } else { self.selected = self.selected.min(len - 1); }
+        if len == 0 {
+            self.selected = 0;
+        } else {
+            self.selected = self.selected.min(len - 1);
+        }
     }
 
     fn current_len(&self) -> usize {

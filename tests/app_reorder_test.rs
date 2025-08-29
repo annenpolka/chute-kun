@@ -1,5 +1,5 @@
-use crossterm::event::KeyCode;
 use chute_kun::app::App;
+use crossterm::event::KeyCode;
 
 #[test]
 fn reorder_down_and_up_updates_order_and_selection() {
@@ -24,4 +24,3 @@ fn reorder_down_and_up_updates_order_and_selection() {
     assert_eq!(titles, vec!["A", "B", "C"]);
     assert_eq!(app.selected_index(), 1);
 }
-

@@ -1,6 +1,6 @@
-use crossterm::event::KeyCode;
 use chute_kun::app::App;
 use chute_kun::task::TaskState;
+use crossterm::event::KeyCode;
 
 #[test]
 fn postpone_moves_selected_to_tomorrow_and_updates_selection() {
@@ -34,4 +34,3 @@ fn postpone_active_task_clears_active() {
     assert_eq!(app.tomorrow_tasks().len(), 1);
     assert_eq!(app.tomorrow_tasks()[0].state, TaskState::Planned); // stays planned
 }
-
