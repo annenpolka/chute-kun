@@ -36,7 +36,7 @@ fn main() -> Result<()> {
         terminal.draw(|f| ui::draw(f, &app))?;
         if event::poll(Duration::from_millis(100))? {
             if let event::Event::Key(k) = event::read()? {
-                app.handle_key(k.code)
+                app.handle_key_event(k)
             }
         }
         if app.should_quit {
