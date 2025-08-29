@@ -34,6 +34,10 @@ cargo run
 cargo test
 ```
 
+## 設定ファイル（config.toml）
+
+`$XDG_CONFIG_HOME/chute_kun/config.toml`（なければ `$HOME/.config/chute_kun/config.toml`）を読み込みます。詳細とサンプルは「docs/configuration.md」を参照してください。
+
 ## ライセンス
 
 MIT

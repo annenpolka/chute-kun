@@ -1,5 +1,73 @@
+use crate::config::{Config, KeySpec};
 use crate::task::{DayPlan, Task};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum KeyAction {
+    Quit,
+    Interrupt,
+    StartOrResume,
+    PauseActive,
+    ReorderDown,
+    ReorderUp,
+    IncreaseEstimate,
+    Postpone,
+    NextView,
+    PrevView,
+    SelectUp,
+    SelectDown,
+    FinishActive,
+}
+
+#[derive(Default, Debug)]
+struct KeyMap(HashMap<KeySpec, KeyAction>);
+
+impl KeyMap {
+    fn with_defaults() -> Self {
+        use KeyAction::*;
+        use KeyCode::*;
+        use KeyModifiers as KM;
+        let mut m = HashMap::new();
+        let mut ins = |code: KeyCode, modifiers: KeyModifiers, act: KeyAction| {
+            m.insert(KeySpec { code, modifiers }, act);
+        };
+        ins(Char('q'), KM::NONE, Quit);
+        ins(Char('i'), KM::NONE, Interrupt);
+        ins(Enter, KM::NONE, StartOrResume);
+        ins(Char(' '), KM::NONE, PauseActive);
+        ins(Char(']'), KM::NONE, ReorderDown);
+        ins(Char('['), KM::NONE, ReorderUp);
+        ins(Char('e'), KM::NONE, IncreaseEstimate);
+        ins(Char('p'), KM::NONE, Postpone);
+        ins(Tab, KM::NONE, NextView);
+        ins(BackTab, KM::NONE, PrevView);
+        ins(Up, KM::NONE, SelectUp);
+        ins(Down, KM::NONE, SelectDown);
+        ins(Char('k'), KM::NONE, SelectUp);
+        ins(Char('j'), KM::NONE, SelectDown);
+        ins(Enter, KM::SHIFT, FinishActive);
+        KeyMap(m)
+    }
+
+    fn bind(&mut self, spec: KeySpec, action: KeyAction) {
+        // remove any existing binding for this action
+        let to_remove: Vec<KeySpec> = self
+            .0
+            .iter()
+            .filter_map(|(k, v)| if *v == action { Some(*k) } else { None })
+            .collect();
+        for k in to_remove {
+            self.0.remove(&k);
+        }
+        self.0.insert(spec, action);
+    }
+
+    fn action_for(&self, ev: KeyEvent) -> Option<KeyAction> {
+        let spec = KeySpec { code: ev.code, modifiers: ev.modifiers };
+        self.0.get(&spec).copied()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum View {
@@ -36,10 +104,16 @@ pub struct App {
     history: Vec<Task>,
     view: View,
     active_accum_sec: u16,
+    config: Config,
+    keymap: KeyMap,
 }
 
 impl App {
     pub fn new() -> Self {
+        let cfg = Config::load().unwrap_or_default();
+        let mut keymap = KeyMap::with_defaults();
+        // Overlay custom key bindings from config
+        Self::apply_config_keys(&mut keymap, &cfg);
         Self {
             title: "Chute_kun".to_string(),
             should_quit: false,
@@ -49,20 +123,52 @@ impl App {
             history: vec![],
             view: View::default(),
             active_accum_sec: 0,
+            config: cfg,
+            keymap,
         }
     }
 
+    fn apply_config_keys(map: &mut KeyMap, cfg: &Config) {
+        use KeyAction::*;
+        let maybe = |name: &str| cfg.key_for(name);
+        if let Some(s) = maybe("quit") { map.bind(s, Quit) }
+        if let Some(s) = maybe("interrupt") { map.bind(s, Interrupt) }
+        if let Some(s) = maybe("start_resume") { map.bind(s, StartOrResume) }
+        if let Some(s) = maybe("pause") { map.bind(s, PauseActive) }
+        if let Some(s) = maybe("reorder_down") { map.bind(s, ReorderDown) }
+        if let Some(s) = maybe("reorder_up") { map.bind(s, ReorderUp) }
+        if let Some(s) = maybe("increase_estimate") { map.bind(s, IncreaseEstimate) }
+        if let Some(s) = maybe("postpone") { map.bind(s, Postpone) }
+        if let Some(s) = maybe("next_view") { map.bind(s, NextView) }
+        if let Some(s) = maybe("prev_view") { map.bind(s, PrevView) }
+        if let Some(s) = maybe("select_up") { map.bind(s, SelectUp) }
+        if let Some(s) = maybe("select_down") { map.bind(s, SelectDown) }
+        if let Some(s) = maybe("finish_active") { map.bind(s, FinishActive) }
+    }
+
     pub fn handle_key(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::Char('q') => {
+        let ev = KeyEvent::new(code, KeyModifiers::NONE);
+        self.handle_key_event(ev);
+    }
+
+    pub fn handle_key_event(&mut self, ev: KeyEvent) {
+        if let Some(action) = self.keymap.action_for(ev) {
+            self.apply_action(action);
+        }
+    }
+
+    fn apply_action(&mut self, action: KeyAction) {
+        use KeyAction::*;
+        match action {
+            Quit => {
                 self.should_quit = true;
             }
-            KeyCode::Char('i') => {
+            Interrupt => {
                 let idx = self.add_task("Interrupt", 15);
                 self.day.start(idx);
                 self.active_accum_sec = 0;
             }
-            KeyCode::Enter => {
+            StartOrResume => {
                 // If nothing active, start/resume the selected if eligible; else first eligible.
                 if self.day.active_index().is_none() {
                     let s = self.selected;
@@ -83,43 +189,33 @@ impl App {
                     }
                 }
             }
-            KeyCode::Char(' ') => {
+            PauseActive => {
                 self.day.pause_active();
             }
-            KeyCode::Char(']') => {
+            ReorderDown => {
                 let new = self.day.reorder_down(self.selected);
                 self.selected = new;
             }
-            KeyCode::Char('[') => {
+            ReorderUp => {
                 let new = self.day.reorder_up(self.selected);
                 self.selected = new;
             }
-            KeyCode::Char('e') => {
+            IncreaseEstimate => {
                 self.day.adjust_estimate(self.selected, 5);
             }
-            KeyCode::Char('p') => {
+            Postpone => {
                 self.postpone_selected();
             }
-            KeyCode::Tab => {
+            NextView => {
                 self.set_view(self.view.next());
             }
-            KeyCode::BackTab => {
+            PrevView => {
                 self.set_view(self.view.prev());
             }
-            KeyCode::Up => self.select_up(),
-            KeyCode::Down => self.select_down(),
-            KeyCode::Char('k') => self.select_up(),
-            KeyCode::Char('j') => self.select_down(),
-            _ => {}
+            SelectUp => self.select_up(),
+            SelectDown => self.select_down(),
+            FinishActive => self.finish_active(),
         }
-    }
-
-    pub fn handle_key_event(&mut self, ev: KeyEvent) {
-        if ev.code == KeyCode::Enter && ev.modifiers.contains(KeyModifiers::SHIFT) {
-            self.finish_active();
-            return;
-        }
-        self.handle_key(ev.code);
     }
 
     pub fn add_task(&mut self, title: &str, estimate_min: u16) -> usize {
@@ -188,6 +284,10 @@ impl App {
 
     pub fn active_carry_seconds(&self) -> u16 {
         self.active_accum_sec
+    }
+
+    pub fn schedule_start_minute_from(&self, now_min: u16) -> u16 {
+        self.config.start_of_day_min.unwrap_or(now_min)
     }
 
     fn set_view(&mut self, v: View) {

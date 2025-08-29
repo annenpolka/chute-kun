@@ -48,7 +48,8 @@ pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
-    format_task_lines_at(local_minutes(), app)
+    let base = app.schedule_start_minute_from(local_minutes());
+    format_task_lines_at(base, app)
 }
 
 // Deterministic variant for tests: inject current minutes since midnight.
