@@ -1,4 +1,7 @@
-use chute_kun::{app::{App, View}, ui::tab_titles};
+use chute_kun::{
+    app::App,
+    ui::tab_titles,
+};
 
 // Red: specify expected tab labels and selection mapping for views.
 #[test]
@@ -22,4 +25,3 @@ fn tab_titles_and_selected_index_follow_view() {
     let (_, sel) = tab_titles(&app);
     assert_eq!(sel, 2);
 }
-

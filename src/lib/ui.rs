@@ -39,7 +39,11 @@ pub fn draw(f: &mut Frame, app: &App) {
 // Returned as (titles, selected_index) to keep rendering logic decoupled for testing.
 pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
     let titles = vec!["Past".to_string(), "Today".to_string(), "Future".to_string()];
-    let selected = match app.view() { View::Past => 0, View::Today => 1, View::Future => 2 };
+    let selected = match app.view() {
+        View::Past => 0,
+        View::Today => 1,
+        View::Future => 2,
+    };
     (titles, selected)
 }
 
@@ -51,7 +55,7 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
     }
 }
 
-fn render_list_slice(app: &App, tasks: &Vec<crate::task::Task>) -> Vec<String> {
+fn render_list_slice(app: &App, tasks: &[crate::task::Task]) -> Vec<String> {
     if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
@@ -62,7 +66,15 @@ fn render_list_slice(app: &App, tasks: &Vec<crate::task::Task>) -> Vec<String> {
         .map(|(i, t)| {
             let sel = if i == app.selected_index() { "▶" } else { " " };
             let secs = if active_idx == Some(i) { app.active_carry_seconds() } else { 0 };
-            format!("{} {} {} (est:{}m act:{}m {}s)", sel, state_icon(t.state), t.title, t.estimate_min, t.actual_min, secs)
+            format!(
+                "{} {} {} (est:{}m act:{}m {}s)",
+                sel,
+                state_icon(t.state),
+                t.title,
+                t.estimate_min,
+                t.actual_min,
+                secs
+            )
         })
         .collect()
 }
@@ -84,7 +96,8 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
 
     let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
     let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
-    let carry_sec: u32 = if app.day.active_index().is_some() { app.active_carry_seconds() as u32 } else { 0 };
+    let carry_sec: u32 =
+        if app.day.active_index().is_some() { app.active_carry_seconds() as u32 } else { 0 };
 
     let total_act_sec = total_act_min * 60 + carry_sec;
     let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
@@ -94,10 +107,7 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     let act_m = (total_act_sec / 60) as u16;
     let act_s = (total_act_sec % 60) as u16;
 
-    format!(
-        "ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s",
-        esd_h, esd_m, rem_m, rem_s, act_m, act_s
-    )
+    format!("ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s", esd_h, esd_m, rem_m, rem_s, act_m, act_s)
 }
 
 fn local_minutes() -> u16 {

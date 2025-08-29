@@ -18,4 +18,3 @@ fn header_and_task_lines_show_seconds() {
     let lines = ui::format_task_lines(&app);
     assert!(lines.iter().any(|l| l.contains("act:0m 5s")));
 }
-

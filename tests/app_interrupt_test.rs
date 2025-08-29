@@ -1,6 +1,6 @@
-use crossterm::event::KeyCode;
 use chute_kun::app::App;
 use chute_kun::task::TaskState;
+use crossterm::event::KeyCode;
 
 #[test]
 fn press_i_creates_active_interrupt_when_empty() {
@@ -26,4 +26,3 @@ fn press_i_pauses_current_and_starts_new_interrupt() {
     assert_eq!(app.day.tasks[last].state, TaskState::Active);
     assert_eq!(app.day.active_index(), Some(last));
 }
-

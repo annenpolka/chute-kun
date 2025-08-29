@@ -19,4 +19,3 @@ fn add_task_does_not_change_active() {
     assert_eq!(day.active_index(), Some(0));
     assert_eq!(day.tasks[1].state, TaskState::Planned);
 }
-

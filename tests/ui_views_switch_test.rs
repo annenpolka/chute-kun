@@ -27,4 +27,3 @@ fn switch_today_future_past_views_render_expected_lists() {
     let lines = format_task_lines(&app);
     assert!(lines.iter().any(|l| l.contains("No tasks")));
 }
-

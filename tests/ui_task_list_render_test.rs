@@ -1,16 +1,6 @@
 use chute_kun::{app::App, ui};
 use ratatui::{backend::TestBackend, Terminal};
 
-fn buffer_to_string(terminal: &Terminal<TestBackend>) -> String {
-    let mut s = String::new();
-    // Capture the current buffer contents into a string by drawing again with a noop
-    // Instead, we rely on the terminal's backend snapshot feature via Frame rendering.
-    // TestBackend exposes the buffer through `backend().buffer()`, but it's not public;
-    // We'll assert via drawing known text width and then checking rendered result using snapshots.
-    // Simpler: re-draw and use `Terminal::backend` debug via `to_string` on area size.
-    // For our purposes, we will return an empty string placeholder because we assert with contains on draw output using size small.
-    s
-}
 
 #[test]
 fn renders_empty_hint_then_task_title() {
@@ -29,4 +19,3 @@ fn renders_empty_hint_then_task_title() {
     app.add_task("Hello", 10);
     terminal.draw(|f| ui::draw(f, &app)).unwrap();
 }
-

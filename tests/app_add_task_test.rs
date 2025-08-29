@@ -9,4 +9,3 @@ fn app_can_add_task() {
     assert_eq!(app.day.tasks.len(), 1);
     assert_eq!(app.day.tasks[0].title, "New Task");
 }
-

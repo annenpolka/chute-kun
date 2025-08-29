@@ -12,4 +12,3 @@ fn esd_uses_remaining_estimate_including_active_progress() {
     // remaining = (30-10) + 60 + 15 = 95 => 540+95 = 635 = 10:35
     assert_eq!(esd, 10 * 60 + 35);
 }
-

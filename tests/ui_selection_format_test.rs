@@ -17,4 +17,3 @@ fn selected_row_shows_marker_and_moves_down() {
     assert!(lines[0].starts_with("  "));
     assert!(lines[1].starts_with("▶ "));
 }
-

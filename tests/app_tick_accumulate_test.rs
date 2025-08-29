@@ -14,4 +14,3 @@ fn tick_adds_minutes_after_60_seconds_active() {
     app.tick(120);
     assert_eq!(app.day.tasks[0].actual_min, 3);
 }
-
