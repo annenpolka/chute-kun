@@ -58,6 +58,10 @@ impl App {
                 self.should_quit = true;
             }
             KeyCode::Char('i') => {
+                // Create a normal (non-interrupt) task as planned, no auto-start
+                let _idx = self.add_task("New Task", 25);
+            }
+            KeyCode::Char('I') => {
                 // Create an interrupt task without auto-starting it
                 let _idx = self.add_task("Interrupt", 15);
             }
