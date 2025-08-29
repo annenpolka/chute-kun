@@ -93,7 +93,6 @@ dependencies = [
  "anyhow",
  "color-eyre",
  "crossterm",
- "once_cell",
  "ratatui",
  "serde",
  "tempfile",
