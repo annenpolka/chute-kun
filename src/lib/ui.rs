@@ -15,10 +15,11 @@ pub fn draw(f: &mut Frame, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Split inner area: tabs on top, task list below
+    // Split inner area: tabs on top, task list, help line at bottom (if space).
+    // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
         .split(inner);
 
     // Tabs for date views
@@ -66,7 +67,15 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
 
     let lines = format_task_lines_at(now, app).join("\n");
     let para = Paragraph::new(lines);
-    f.render_widget(para, chunks[1]);
+    if chunks.len() >= 2 && chunks[1].height > 0 {
+        f.render_widget(para, chunks[1]);
+    }
+
+    // Help line at the bottom
+    if chunks.len() >= 3 && chunks[2].height > 0 {
+        let help = Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
+        f.render_widget(help, chunks[2]);
+    }
 }
 
 // Tab metadata for the date views (Past/Today/Future).
