@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Tabs},
 };
 
 use crate::app::{App, View};
@@ -14,9 +14,33 @@ pub fn draw(f: &mut Frame, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
+    // Split inner area: tabs on top, task list below
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    // Tabs for date views
+    let (titles, selected) = tab_titles(app);
+    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
+    let tabs = Tabs::new(titles)
+        .select(selected)
+        .highlight_style(Style::default().fg(Color::Yellow))
+        .divider(Span::raw("│"));
+    f.render_widget(tabs, chunks[0]);
+
+    // Main list content
     let lines = format_task_lines(app).join("\n");
     let para = Paragraph::new(lines);
-    f.render_widget(para, inner);
+    f.render_widget(para, chunks[1]);
+}
+
+// Tab metadata for the date views (Past/Today/Future).
+// Returned as (titles, selected_index) to keep rendering logic decoupled for testing.
+pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
+    let titles = vec!["Past".to_string(), "Today".to_string(), "Future".to_string()];
+    let selected = match app.view() { View::Past => 0, View::Today => 1, View::Future => 2 };
+    (titles, selected)
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
@@ -31,20 +55,14 @@ fn render_list_slice(app: &App, tasks: &Vec<crate::task::Task>) -> Vec<String> {
     if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
+    let active_idx = app.day.active_index();
     tasks
         .iter()
         .enumerate()
         .map(|(i, t)| {
             let sel = if i == app.selected_index() { "▶" } else { " " };
-            format!(
-                "{} {} {} (est:{}m act:{}m {}s)",
-                sel,
-                state_icon(t.state),
-                t.title,
-                t.estimate_min,
-                t.actual_min,
-                t.actual_sec
-            )
+            let secs = if active_idx == Some(i) { app.active_carry_seconds() } else { 0 };
+            format!("{} {} {} (est:{}m act:{}m {}s)", sel, state_icon(t.state), t.title, t.estimate_min, t.actual_min, secs)
         })
         .collect()
 }
@@ -63,26 +81,22 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     let esd_min = app.day.esd(now_min);
     let esd_h = esd_min / 60;
     let esd_m = esd_min % 60;
+
     let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
-    let total_act_sec: u32 = app
-        .day
-        .tasks
-        .iter()
-        .map(|t| (t.actual_min as u32) * 60 + (t.actual_sec as u32))
-        .sum();
+    let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
+    let carry_sec: u32 = if app.day.active_index().is_some() { app.active_carry_seconds() as u32 } else { 0 };
+
+    let total_act_sec = total_act_min * 60 + carry_sec;
     let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
+
     let rem_m = (rem_total_sec / 60) as u16;
     let rem_s = (rem_total_sec % 60) as u16;
     let act_m = (total_act_sec / 60) as u16;
     let act_s = (total_act_sec % 60) as u16;
-    let view = match app.view() {
-        crate::app::View::Past => "Past",
-        crate::app::View::Today => "Today",
-        crate::app::View::Future => "Future",
-    };
+
     format!(
-        "ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s | View: {}",
-        esd_h, esd_m, rem_m, rem_s, act_m, act_s, view
+        "ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s",
+        esd_h, esd_m, rem_m, rem_s, act_m, act_s
     )
 }
 
