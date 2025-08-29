@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Tabs},
 };
 
 use crate::app::{App, View};
@@ -14,9 +14,33 @@ pub fn draw(f: &mut Frame, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
+    // Split inner area: tabs on top, task list below
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    // Tabs for date views
+    let (titles, selected) = tab_titles(app);
+    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
+    let tabs = Tabs::new(titles)
+        .select(selected)
+        .highlight_style(Style::default().fg(Color::Yellow))
+        .divider(Span::raw("│"));
+    f.render_widget(tabs, chunks[0]);
+
+    // Main list content
     let lines = format_task_lines(app).join("\n");
     let para = Paragraph::new(lines);
-    f.render_widget(para, inner);
+    f.render_widget(para, chunks[1]);
+}
+
+// Tab metadata for the date views (Past/Today/Future).
+// Returned as (titles, selected_index) to keep rendering logic decoupled for testing.
+pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
+    let titles = vec!["Past".to_string(), "Today".to_string(), "Future".to_string()];
+    let selected = match app.view() { View::Past => 0, View::Today => 1, View::Future => 2 };
+    (titles, selected)
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
