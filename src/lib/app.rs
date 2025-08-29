@@ -7,11 +7,12 @@ pub struct App {
     pub should_quit: bool,
     pub day: DayPlan,
     selected: usize,
+    tomorrow: Vec<Task>,
 }
 
 impl App {
     pub fn new() -> Self {
-        Self { title: "Chute_kun".to_string(), should_quit: false, day: DayPlan::new(vec![]), selected: 0 }
+        Self { title: "Chute_kun".to_string(), should_quit: false, day: DayPlan::new(vec![]), selected: 0, tomorrow: vec![] }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
@@ -50,6 +51,9 @@ impl App {
             KeyCode::Char('e') => {
                 self.day.adjust_estimate(self.selected, 5);
             }
+            KeyCode::Char('p') => {
+                self.postpone_selected();
+            }
             KeyCode::Up => self.select_up(),
             KeyCode::Down => self.select_down(),
             _ => {}
@@ -82,4 +86,20 @@ impl App {
         let last = self.day.tasks.len() - 1;
         self.selected = (self.selected + 1).min(last);
     }
+
+    pub fn postpone_selected(&mut self) {
+        if self.day.tasks.is_empty() { return; }
+        let idx = self.selected.min(self.day.tasks.len() - 1);
+        if let Some(task) = self.day.remove(idx) {
+            // stay planned for tomorrow
+            self.tomorrow.push(Task { state: crate::task::TaskState::Planned, ..task });
+        }
+        if !self.day.tasks.is_empty() {
+            self.selected = self.selected.min(self.day.tasks.len() - 1);
+        } else {
+            self.selected = 0;
+        }
+    }
+
+    pub fn tomorrow_tasks(&self) -> &Vec<Task> { &self.tomorrow }
 }

@@ -116,6 +116,19 @@ impl DayPlan {
             t.estimate_min = cur.max(0) as u16;
         }
     }
+
+    pub fn remove(&mut self, index: usize) -> Option<Task> {
+        if index >= self.tasks.len() { return None; }
+        // fix active pointer
+        if let Some(a) = self.active {
+            if a == index {
+                self.active = None;
+            } else if a > index {
+                self.active = Some(a - 1);
+            }
+        }
+        Some(self.tasks.remove(index))
+    }
 }
 
 // ESD(見込み終了時刻) = now(min) + 残分合計
