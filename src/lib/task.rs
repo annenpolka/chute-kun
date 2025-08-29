@@ -10,12 +10,13 @@ pub enum TaskState {
 pub struct Task {
     pub title: String,
     pub estimate_min: u16,
+    pub actual_min: u16,
     pub state: TaskState,
 }
 
 impl Task {
     pub fn new(title: &str, estimate_min: u16) -> Self {
-        Self { title: title.to_string(), estimate_min, state: TaskState::Planned }
+        Self { title: title.to_string(), estimate_min, actual_min: 0, state: TaskState::Planned }
     }
 }
 
@@ -55,6 +56,39 @@ impl DayPlan {
             self.active = Some(index);
         }
     }
+
+    pub fn pause_active(&mut self) {
+        if let Some(cur) = self.active.take() {
+            if let Some(t) = self.tasks.get_mut(cur) {
+                t.state = TaskState::Paused;
+            }
+        }
+    }
+
+    pub fn finish_active(&mut self) {
+        if let Some(cur) = self.active.take() {
+            if let Some(t) = self.tasks.get_mut(cur) {
+                t.state = TaskState::Done;
+            }
+        }
+    }
+
+    pub fn add_actual_to_active(&mut self, minutes: u16) {
+        if let Some(cur) = self.active {
+            if let Some(t) = self.tasks.get_mut(cur) {
+                t.actual_min = t.actual_min.saturating_add(minutes);
+            }
+        }
+    }
+
+    pub fn remaining_total_min(&self) -> u16 {
+        self.tasks.iter().map(|t| match t.state {
+            TaskState::Done => 0,
+            _ => t.estimate_min.saturating_sub(t.actual_min),
+        }).sum()
+    }
+
+    pub fn esd(&self, now_min: u16) -> u16 { esd_from(now_min, &[self.remaining_total_min()]) }
 }
 
 // ESD(見込み終了時刻) = now(min) + 残分合計
