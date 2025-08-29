@@ -25,7 +25,8 @@
 - Reorder: `Alt+↑/↓`（または `[`/`]`）
 - Edit Estimate: `e`（数値分）
 - Postpone(持越し): `p`（翌日へ/日時指定）
-- Interrupt(割込作成&開始): `i`
+- New Task 入力モード: `i`（タイトルを入力→`Enter`で追加、`Esc`でキャンセル、`Backspace`で編集）
+- Interrupt 入力モード: `I`（同上／デフォ見積は15m）
 - Split(分割): `s`
 - Toggle Detail: `d`
 - Filter/Search: `/`
@@ -46,6 +47,11 @@
 ## 見積と終了見込み
 - `ESD(見込み終了時刻) = now + (active残 + キュー残の見積和)` を随時計算。
 - オーバー/余裕は `ESD - 希望終業時刻`。
+
+### 入力モード（New/Interrupt）
+- 画面下部に `Input: <buffer> (Enter=Add Esc=Cancel)` を表示。
+- デフォルト見積: New Task=25m、Interrupt=15m。
+- タイトル未入力で `Enter` の場合はそれぞれ `New Task` / `Interrupt` で作成。
 
 ## Todoist 連携（プロトコル）
 - 認証: API Token（環境変数）。

@@ -29,8 +29,14 @@ pub fn draw(f: &mut Frame, app: &App) {
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
 
-    // Main list content
-    let lines = format_task_lines(app).join("\n");
+    // Main content: input prompt when in input mode; otherwise task list
+    let content_lines = if app.in_input_mode() {
+        let buf = app.input_buffer().unwrap_or("");
+        vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)]
+    } else {
+        format_task_lines(app)
+    };
+    let lines = content_lines.join("\n");
     let para = Paragraph::new(lines);
     f.render_widget(para, chunks[1]);
 }
@@ -53,6 +59,10 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
 
 // Deterministic variant for tests: inject current minutes since midnight.
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
+    if app.in_input_mode() {
+        let buf = app.input_buffer().unwrap_or("");
+        return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
+    }
     match app.view() {
         View::Past => render_list_slice(now_min, app, app.history_tasks()),
         View::Today => render_list_slice(now_min, app, &app.day.tasks),
