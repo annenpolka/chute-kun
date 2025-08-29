@@ -7,7 +7,7 @@ Chute_kun reads an optional TOML config from the XDG config directory:
 ## Options
 
 - `start_of_day` (string HH:MM): When set, task list time prefixes start from this minute instead of the current time.
-- `esd_base` ("now" | "start_of_day"): Controls the base minute used to calculate the header’s ESD. Default is `"now"`. Set to `"start_of_day"` to use the configured start time.
+- `esd_base` ("now" | "start_of_day"): Controls the base minute used to calculate the header’s ESD. Default is `"start_of_day"`. If `start_of_day` is not set, it falls back to current time.
 - `[keys]` table: Override key bindings by action name. Values accept characters (e.g., `'q'`, `']'`) or names like "enter", "space", "tab", "backtab", "up", "down". "shift+enter" is supported.
 
 ### Supported actions
@@ -30,7 +30,8 @@ Chute_kun reads an optional TOML config from the XDG config directory:
 
 ```toml
 start_of_day = "09:00"
-esd_base = "now" # or "start_of_day"
+# esd_base defaults to "start_of_day"; explicitly set if you prefer real time
+# esd_base = "now"
 
 [keys]
 quit = 'x'

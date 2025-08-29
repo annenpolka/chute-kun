@@ -89,7 +89,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { start_of_day_min: None, keys: HashMap::new(), esd_base: ESDBase::Now }
+        Self { start_of_day_min: None, keys: HashMap::new(), esd_base: ESDBase::StartOfDay }
     }
 }
 
