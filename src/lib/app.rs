@@ -8,17 +8,12 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        Self {
-            title: "Chute_kun".to_string(),
-            should_quit: false,
-        }
+        Self { title: "Chute_kun".to_string(), should_quit: false }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::Char('q') => self.should_quit = true,
-            _ => {}
+        if let KeyCode::Char('q') = code {
+            self.should_quit = true;
         }
     }
 }
-

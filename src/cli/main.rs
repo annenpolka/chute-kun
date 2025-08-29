@@ -35,12 +35,13 @@ fn main() -> Result<()> {
     loop {
         terminal.draw(|f| ui::draw(f, &app))?;
         if event::poll(Duration::from_millis(100))? {
-            match event::read()? {
-                event::Event::Key(k) => app.handle_key(k.code),
-                _ => {}
+            if let event::Event::Key(k) = event::read()? {
+                app.handle_key(k.code)
             }
         }
-        if app.should_quit { break; }
+        if app.should_quit {
+            break;
+        }
     }
 
     restore_terminal(terminal)?;

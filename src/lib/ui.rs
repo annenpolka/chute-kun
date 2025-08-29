@@ -1,4 +1,8 @@
-use ratatui::{layout::Rect, prelude::*, widgets::{Block, Borders}};
+use ratatui::{
+    layout::Rect,
+    prelude::*,
+    widgets::{Block, Borders},
+};
 
 use crate::app::App;
 

@@ -1,0 +1,7 @@
+[alias]
+# Run Clippy across workspace and all targets
+lint = "clippy --workspace --all-targets --all-features -- -D warnings"
+
+# Check that code is formatted
+fmt-check = "fmt --all -- --check"
+
