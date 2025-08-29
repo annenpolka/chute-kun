@@ -2,7 +2,6 @@
 
 TaskChute メソッドを実装した Todoist タスク管理 CLI ツール
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 TaskChute の考え方を Todoist API と連携し、コマンドラインから効率的なタスク管理を実現します。
@@ -21,7 +20,7 @@ MIT
 
 ## 関連ドキュメント
 
-- [TaskChute methodology](TaskChute_methodology.md)
+- [TaskChute methodology](docs/TaskChute_methodology.md)
 - [ドキュメント一覧](docs/README.md)
 - [システム概要](docs/system-overview.md)
 - [実装状況](docs/setup/implementation-status.md)
