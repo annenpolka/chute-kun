@@ -1,6 +1,30 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::task::{DayPlan, Task};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum View { Past, Today, Future }
+
+impl Default for View {
+    fn default() -> Self { View::Today }
+}
+
+impl View {
+    fn next(self) -> Self {
+        match self {
+            View::Past => View::Today,
+            View::Today => View::Future,
+            View::Future => View::Past,
+        }
+    }
+    fn prev(self) -> Self {
+        match self {
+            View::Past => View::Future,
+            View::Today => View::Past,
+            View::Future => View::Today,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct App {
     pub title: String,
@@ -8,11 +32,21 @@ pub struct App {
     pub day: DayPlan,
     selected: usize,
     tomorrow: Vec<Task>,
+    history: Vec<Task>,
+    view: View,
 }
 
 impl App {
     pub fn new() -> Self {
-        Self { title: "Chute_kun".to_string(), should_quit: false, day: DayPlan::new(vec![]), selected: 0, tomorrow: vec![] }
+        Self {
+            title: "Chute_kun".to_string(),
+            should_quit: false,
+            day: DayPlan::new(vec![]),
+            selected: 0,
+            tomorrow: vec![],
+            history: vec![],
+            view: View::default(),
+        }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
@@ -53,6 +87,12 @@ impl App {
             }
             KeyCode::Char('p') => {
                 self.postpone_selected();
+            }
+            KeyCode::Tab => {
+                self.set_view(self.view.next());
+            }
+            KeyCode::BackTab => {
+                self.set_view(self.view.prev());
             }
             KeyCode::Up => self.select_up(),
             KeyCode::Down => self.select_down(),
@@ -102,4 +142,22 @@ impl App {
     }
 
     pub fn tomorrow_tasks(&self) -> &Vec<Task> { &self.tomorrow }
+    pub fn history_tasks(&self) -> &Vec<Task> { &self.history }
+
+    pub fn view(&self) -> View { self.view }
+
+    fn set_view(&mut self, v: View) {
+        self.view = v;
+        // clamp selection to current view length
+        let len = self.current_len();
+        if len == 0 { self.selected = 0; } else { self.selected = self.selected.min(len - 1); }
+    }
+
+    fn current_len(&self) -> usize {
+        match self.view {
+            View::Past => self.history.len(),
+            View::Today => self.day.tasks.len(),
+            View::Future => self.tomorrow.len(),
+        }
+    }
 }

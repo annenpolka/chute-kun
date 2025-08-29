@@ -4,7 +4,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::app::App;
+use crate::app::{App, View};
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
@@ -20,12 +20,18 @@ pub fn draw(f: &mut Frame, app: &App) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
-    if app.day.tasks.is_empty() {
+    match app.view() {
+        View::Past => render_list_slice(app, app.history_tasks()),
+        View::Today => render_list_slice(app, &app.day.tasks),
+        View::Future => render_list_slice(app, app.tomorrow_tasks()),
+    }
+}
+
+fn render_list_slice(app: &App, tasks: &Vec<crate::task::Task>) -> Vec<String> {
+    if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
-    app
-        .day
-        .tasks
+    tasks
         .iter()
         .enumerate()
         .map(|(i, t)| {
