@@ -8,6 +8,10 @@ Chute_kun loads configuration from the following path on startup and during UI r
 
 If the file is missing, sensible defaults are used.
 
+## CLI Helpers
+
+- `chute_kun --write-default-config` (alias: `init-config`): writes a default `config.toml` to the resolved config directory, without overwriting if it already exists. Prints the path and exits.
+
 ## Keys
 
 You can customize a subset of keybindings. Values are single characters; use `"space"` (or `"SPC"`) for the space key.
@@ -31,4 +35,3 @@ reorder_down = "]"  # move selected down
 Notes:
 - Arrow keys, `Tab`/`Shift-Tab`, and `Enter`/`Shift+Enter` are currently fixed.
 - The application reads the config when handling input and rendering, so edits take effect on next redraw.
-

@@ -5,8 +5,8 @@ use ratatui::{
 };
 
 use crate::app::{App, View};
-use crate::task::TaskState;
 use crate::config;
+use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.size();

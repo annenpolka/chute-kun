@@ -70,7 +70,11 @@ fn parse_hhmm_to_min(s: &str) -> Option<u16> {
     }
     let h: u16 = parts[0].parse().ok()?;
     let m: u16 = parts[1].parse().ok()?;
-    if h < 24 && m < 60 { Some(h * 60 + m) } else { None }
+    if h < 24 && m < 60 {
+        Some(h * 60 + m)
+    } else {
+        None
+    }
 }
 
 fn parse_key_char(s: &str) -> Option<char> {
@@ -142,4 +146,40 @@ pub fn load() -> Config {
         }
     }
     cfg
+}
+
+pub fn default_toml() -> String {
+    r#"start_of_day = "09:00"
+
+[keybindings]
+quit = "q"
+interrupt = "i"
+pause = "space"
+inc_estimate = "e"
+postpone = "p"
+select_up = "k"
+select_down = "j"
+reorder_up = "["
+reorder_down = "]"
+"#
+    .to_string()
+}
+
+pub fn write_default_config() -> std::io::Result<(PathBuf, bool)> {
+    let Some(dir) = config_dir() else {
+        // Fallback to current directory
+        let p = PathBuf::from("config.toml");
+        if p.exists() {
+            return Ok((p, false));
+        }
+        fs::write(&p, default_toml())?;
+        return Ok((p, true));
+    };
+    fs::create_dir_all(&dir)?;
+    let p = dir.join("config.toml");
+    if p.exists() {
+        return Ok((p, false));
+    }
+    fs::write(&p, default_toml())?;
+    Ok((p, true))
 }

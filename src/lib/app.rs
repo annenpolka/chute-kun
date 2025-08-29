@@ -1,5 +1,5 @@
-use crate::task::{DayPlan, Task};
 use crate::config;
+use crate::task::{DayPlan, Task};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

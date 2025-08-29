@@ -5,7 +5,7 @@ use anyhow::Result;
 use crossterm::{cursor, event, execute, terminal};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use chute_kun::{app::App, ui};
+use chute_kun::{app::App, config, ui};
 
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
@@ -28,6 +28,22 @@ fn main() -> Result<()> {
         .with_target(false)
         .compact()
         .init();
+
+    // Lightweight arg check for non-interactive helpers
+    if let Some(arg1) = std::env::args().nth(1) {
+        match arg1.as_str() {
+            "--write-default-config" | "init-config" => {
+                let (path, created) = config::write_default_config()?;
+                if created {
+                    println!("Wrote default config to {}", path.display());
+                } else {
+                    println!("Config already exists at {}", path.display());
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
 
     let mut terminal = setup_terminal()?;
     let mut app = App::new();

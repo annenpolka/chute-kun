@@ -1,5 +1,5 @@
-use chute_kun::ui::format_task_lines;
 use chute_kun::app::App;
+use chute_kun::ui::format_task_lines;
 
 #[test]
 fn shows_hint_when_no_tasks_then_title_after_add() {

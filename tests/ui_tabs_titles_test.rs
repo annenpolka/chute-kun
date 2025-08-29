@@ -1,7 +1,4 @@
-use chute_kun::{
-    app::App,
-    ui::tab_titles,
-};
+use chute_kun::{app::App, ui::tab_titles};
 
 // Red: specify expected tab labels and selection mapping for views.
 #[test]

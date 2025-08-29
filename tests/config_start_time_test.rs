@@ -31,4 +31,3 @@ fn start_of_day_can_be_overridden_by_config_toml() {
     let lines = ui::format_task_lines(&app);
     assert!(lines[0].starts_with("08:15 "));
 }
-
