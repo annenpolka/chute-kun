@@ -21,6 +21,7 @@
 - Start/Resume: `Enter`
 - Pause: `Space`
 - Finish(Complete): `Shift+Enter`
+- Navigate(選択移動): `↑/↓` または `j/k`
 - Reorder: `Alt+↑/↓`（または `[`/`]`）
 - Edit Estimate: `e`（数値分）
 - Postpone(持越し): `p`（翌日へ/日時指定）
@@ -72,4 +73,3 @@
 ## 参考
 - 再調査メモ: `docs/research/taskchute-research-2025-08.md`
 - Todoist API: `docs/adr/ADR-001-TaskManagementAPI-Selection.md`
-
