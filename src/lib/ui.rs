@@ -5,11 +5,12 @@ use ratatui::{
 };
 
 use crate::app::{App, View};
+use crate::clock::{system_now_minutes, Clock};
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.size();
-    let header = format_header_line(local_minutes(), app);
+    let header = format_header_line(system_now_minutes(), app);
     let block = Block::default().title(header).borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -41,6 +42,33 @@ pub fn draw(f: &mut Frame, app: &App) {
     f.render_widget(para, chunks[1]);
 }
 
+/// Like `draw`, but uses an injected `Clock` for current time.
+pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
+    let area: Rect = f.size();
+    let now = clock.now_minutes();
+    let header = format_header_line(now, app);
+    let block = Block::default().title(header).borders(Borders::ALL);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    let (titles, selected) = tab_titles(app);
+    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
+    let tabs = Tabs::new(titles)
+        .select(selected)
+        .highlight_style(Style::default().fg(Color::Yellow))
+        .divider(Span::raw("│"));
+    f.render_widget(tabs, chunks[0]);
+
+    let lines = format_task_lines_at(now, app).join("\n");
+    let para = Paragraph::new(lines);
+    f.render_widget(para, chunks[1]);
+}
+
 // Tab metadata for the date views (Past/Today/Future).
 // Returned as (titles, selected_index) to keep rendering logic decoupled for testing.
 pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
@@ -54,7 +82,7 @@ pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
-    format_task_lines_at(local_minutes(), app)
+    format_task_lines_at(system_now_minutes(), app)
 }
 
 // Deterministic variant for tests: inject current minutes since midnight.
@@ -146,13 +174,4 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     format!("ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s", esd_h, esd_m, rem_m, rem_s, act_m, act_s)
 }
 
-fn local_minutes() -> u16 {
-    // Best-effort minutes since UTC midnight; good enough for on-screen ESD.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-        let minutes = (dur.as_secs() % 86_400) / 60;
-        minutes as u16
-    } else {
-        9 * 60
-    }
-}
+// Local time retrieval moved to `crate::clock`.
