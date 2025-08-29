@@ -4,3 +4,5 @@ pub mod app;
 pub mod task;
 #[path = "lib/ui.rs"]
 pub mod ui;
+#[path = "lib/clock.rs"]
+pub mod clock;

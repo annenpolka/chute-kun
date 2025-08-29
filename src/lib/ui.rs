@@ -5,11 +5,12 @@ use ratatui::{
 };
 
 use crate::app::{App, View};
+use crate::clock::system_now_minutes;
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.size();
-    let header = format_header_line(local_minutes(), app);
+    let header = format_header_line(system_now_minutes(), app);
     let block = Block::default().title(header).borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -48,7 +49,7 @@ pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
-    format_task_lines_at(local_minutes(), app)
+    format_task_lines_at(system_now_minutes(), app)
 }
 
 // Deterministic variant for tests: inject current minutes since midnight.
@@ -136,13 +137,4 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     format!("ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s", esd_h, esd_m, rem_m, rem_s, act_m, act_s)
 }
 
-fn local_minutes() -> u16 {
-    // Best-effort minutes since UTC midnight; good enough for on-screen ESD.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-        let minutes = (dur.as_secs() % 86_400) / 60;
-        minutes as u16
-    } else {
-        9 * 60
-    }
-}
+// Local time retrieval moved to `crate::clock`.
