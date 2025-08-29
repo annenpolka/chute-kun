@@ -6,6 +6,7 @@ use ratatui::{
 
 use crate::app::{App, View};
 use crate::task::TaskState;
+use crate::config;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.size();
@@ -137,12 +138,6 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
 }
 
 fn local_minutes() -> u16 {
-    // Best-effort minutes since UTC midnight; good enough for on-screen ESD.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-        let minutes = (dur.as_secs() % 86_400) / 60;
-        minutes as u16
-    } else {
-        9 * 60
-    }
+    // For display, use configured start-of-day minutes; default 09:00.
+    config::load().start_of_day_min
 }

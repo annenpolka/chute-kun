@@ -1,4 +1,5 @@
 use crate::task::{DayPlan, Task};
+use crate::config;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -53,11 +54,12 @@ impl App {
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
+        let keys = config::load().keys;
         match code {
-            KeyCode::Char('q') => {
+            KeyCode::Char(c) if c == keys.quit => {
                 self.should_quit = true;
             }
-            KeyCode::Char('i') => {
+            KeyCode::Char(c) if c == keys.interrupt => {
                 let idx = self.add_task("Interrupt", 15);
                 self.day.start(idx);
                 self.active_accum_sec = 0;
@@ -83,21 +85,21 @@ impl App {
                     }
                 }
             }
-            KeyCode::Char(' ') => {
+            KeyCode::Char(c) if c == keys.pause => {
                 self.day.pause_active();
             }
-            KeyCode::Char(']') => {
+            KeyCode::Char(c) if c == keys.reorder_down => {
                 let new = self.day.reorder_down(self.selected);
                 self.selected = new;
             }
-            KeyCode::Char('[') => {
+            KeyCode::Char(c) if c == keys.reorder_up => {
                 let new = self.day.reorder_up(self.selected);
                 self.selected = new;
             }
-            KeyCode::Char('e') => {
+            KeyCode::Char(c) if c == keys.inc_estimate => {
                 self.day.adjust_estimate(self.selected, 5);
             }
-            KeyCode::Char('p') => {
+            KeyCode::Char(c) if c == keys.postpone => {
                 self.postpone_selected();
             }
             KeyCode::Tab => {
@@ -108,8 +110,8 @@ impl App {
             }
             KeyCode::Up => self.select_up(),
             KeyCode::Down => self.select_down(),
-            KeyCode::Char('k') => self.select_up(),
-            KeyCode::Char('j') => self.select_down(),
+            KeyCode::Char(c) if c == keys.select_up => self.select_up(),
+            KeyCode::Char(c) if c == keys.select_down => self.select_down(),
             _ => {}
         }
     }

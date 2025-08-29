@@ -13,11 +13,15 @@ crossterm = "0.27"
 ratatui = "0.26"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+once_cell = "1"
 
 [dev-dependencies]
 # keep same versions available to tests
 ratatui = "0.26"
 crossterm = "0.27"
+tempfile = "3"
 
 [[bin]]
 name = "chute_kun"
