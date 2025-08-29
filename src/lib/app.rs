@@ -310,12 +310,13 @@ impl App {
     }
 
     pub fn schedule_start_minute_from(&self, now_min: u16) -> u16 {
-        self.config.start_of_day_min.unwrap_or(now_min)
+        self.config.start_of_day_min.unwrap_or(9 * 60)
     }
 
     pub fn esd_base_minute_from(&self, now_min: u16) -> u16 {
         match (self.config.esd_base, self.config.start_of_day_min) {
             (ESDBase::StartOfDay, Some(min)) => min,
+            (ESDBase::StartOfDay, None) => 9 * 60,
             _ => now_min,
         }
     }
