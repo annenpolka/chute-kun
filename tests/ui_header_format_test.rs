@@ -1,4 +1,4 @@
-use chute_kun::{app::{App, View}, ui::format_header_line};
+use chute_kun::{app::App, ui::format_header_line};
 
 #[test]
 fn header_shows_esd_and_totals() {
@@ -10,5 +10,6 @@ fn header_shows_esd_and_totals() {
     assert!(s.contains("ESD 10:30"));
     assert!(s.contains("Est 90m"));
     assert!(s.contains("Act 0m"));
-    assert!(s.contains("View: Today"));
+    // The header should not include the view label; tabs show it now.
+    assert!(!s.contains("View:"));
 }
