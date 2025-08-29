@@ -14,10 +14,11 @@ pub fn draw(f: &mut Frame, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Split inner area: tabs on top, task list below
+    // Split inner area: tabs on top, task list, help line at bottom (if space).
+    // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
         .split(inner);
 
     // Tabs for date views
@@ -32,7 +33,15 @@ pub fn draw(f: &mut Frame, app: &App) {
     // Main list content
     let lines = format_task_lines(app).join("\n");
     let para = Paragraph::new(lines);
-    f.render_widget(para, chunks[1]);
+    if chunks.len() >= 2 && chunks[1].height > 0 {
+        f.render_widget(para, chunks[1]);
+    }
+
+    // Help line at the bottom
+    if chunks.len() >= 3 && chunks[2].height > 0 {
+        let help = Paragraph::new(format_help_line()).style(Style::default().fg(Color::DarkGray));
+        f.render_widget(help, chunks[2]);
+    }
 }
 
 // Tab metadata for the date views (Past/Today/Future).
@@ -145,4 +154,11 @@ fn local_minutes() -> u16 {
     } else {
         9 * 60
     }
+}
+
+// One-line help for common keys. Keep concise to fit narrow terminals.
+pub fn format_help_line() -> String {
+    // Group by intent: lifecycle, edit, navigate, quit.
+    // Keep tokens like "Shift+Enter" and brackets to make tests and user scanning easy.
+    "Enter: start/resume  Shift+Enter: finish  Space: pause  i: interrupt  e: +5m  [: up  ]: down  p: postpone  Tab: next  Shift+Tab: prev  q: quit".to_string()
 }
