@@ -5,11 +5,12 @@ use ratatui::{
 };
 
 use crate::app::{App, View};
+use crate::clock::{system_now_minutes, Clock};
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.size();
-    let header = format_header_line(local_minutes(), app);
+    let header = format_header_line(system_now_minutes(), app);
     let block = Block::default().title(header).borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -30,8 +31,41 @@ pub fn draw(f: &mut Frame, app: &App) {
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
 
-    // Main list content
-    let lines = format_task_lines(app).join("\n");
+    // Main content: input prompt when in input mode; otherwise task list
+    let content_lines = if app.in_input_mode() {
+        let buf = app.input_buffer().unwrap_or("");
+        vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)]
+    } else {
+        format_task_lines(app)
+    };
+    let lines = content_lines.join("\n");
+    let para = Paragraph::new(lines);
+    f.render_widget(para, chunks[1]);
+}
+
+/// Like `draw`, but uses an injected `Clock` for current time.
+pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
+    let area: Rect = f.size();
+    let now = clock.now_minutes();
+    let header = format_header_line(now, app);
+    let block = Block::default().title(header).borders(Borders::ALL);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    let (titles, selected) = tab_titles(app);
+    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
+    let tabs = Tabs::new(titles)
+        .select(selected)
+        .highlight_style(Style::default().fg(Color::Yellow))
+        .divider(Span::raw("│"));
+    f.render_widget(tabs, chunks[0]);
+
+    let lines = format_task_lines_at(now, app).join("\n");
     let para = Paragraph::new(lines);
     if chunks.len() >= 2 && chunks[1].height > 0 {
         f.render_widget(para, chunks[1]);
@@ -57,11 +91,15 @@ pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
-    format_task_lines_at(local_minutes(), app)
+    format_task_lines_at(system_now_minutes(), app)
 }
 
 // Deterministic variant for tests: inject current minutes since midnight.
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
+    if app.in_input_mode() {
+        let buf = app.input_buffer().unwrap_or("");
+        return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
+    }
     match app.view() {
         View::Past => render_list_slice(now_min, app, app.history_tasks()),
         View::Today => render_list_slice(now_min, app, &app.day.tasks),
@@ -145,37 +183,4 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     format!("ESD {:02}:{:02} | Est {}m {}s | Act {}m {}s", esd_h, esd_m, rem_m, rem_s, act_m, act_s)
 }
 
-fn local_minutes() -> u16 {
-    // Best-effort minutes since UTC midnight; good enough for on-screen ESD.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    if let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) {
-        let minutes = (dur.as_secs() % 86_400) / 60;
-        minutes as u16
-    } else {
-        9 * 60
-    }
-}
-
-// One-line help for common keys. Keep concise to fit narrow terminals.
-pub fn format_help_line() -> String {
-    // Group by intent: lifecycle, edit, navigate, quit.
-    // Keep tokens like "Shift+Enter" and brackets to make tests and user scanning easy.
-    "Enter: start/resume  Shift+Enter: finish  Space: pause  i: interrupt  e: +5m  [: up  ]: down  p: postpone  Tab: next  Shift+Tab: prev  q: quit".to_string()
-}
-
-// Contextual help: optimize content for current view.
-pub fn format_help_line_for(app: &App) -> String {
-    match app.view() {
-        View::Today => {
-            // Keep full actionable help on Today where operations are valid.
-            format!(
-                "{}  j/k,↑/↓: move",
-                format_help_line()
-            )
-        }
-        View::Future | View::Past => {
-            // Limit to navigation/quit; lifecycle and edit ops are not applicable in these views.
-            "j/k,↑/↓: move  Tab: next  Shift+Tab: prev  q: quit".to_string()
-        }
-    }
-}
+// Local time retrieval moved to `crate::clock`.
