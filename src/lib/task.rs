@@ -89,6 +89,33 @@ impl DayPlan {
     }
 
     pub fn esd(&self, now_min: u16) -> u16 { esd_from(now_min, &[self.remaining_total_min()]) }
+
+    pub fn reorder_down(&mut self, index: usize) -> usize {
+        if index + 1 >= self.tasks.len() { return index; }
+        self.tasks.swap(index, index + 1);
+        if let Some(a) = self.active.as_mut() {
+            if *a == index { *a = index + 1; }
+            else if *a == index + 1 { *a = index; }
+        }
+        index + 1
+    }
+
+    pub fn reorder_up(&mut self, index: usize) -> usize {
+        if index == 0 || index >= self.tasks.len() { return index; }
+        self.tasks.swap(index - 1, index);
+        if let Some(a) = self.active.as_mut() {
+            if *a == index { *a = index - 1; }
+            else if *a == index - 1 { *a = index; }
+        }
+        index - 1
+    }
+
+    pub fn adjust_estimate(&mut self, index: usize, delta_min: i16) {
+        if let Some(t) = self.tasks.get_mut(index) {
+            let cur = t.estimate_min as i16 + delta_min;
+            t.estimate_min = cur.max(0) as u16;
+        }
+    }
 }
 
 // ESD(見込み終了時刻) = now(min) + 残分合計

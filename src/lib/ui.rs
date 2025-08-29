@@ -27,7 +27,11 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
         .day
         .tasks
         .iter()
-        .map(|t| format!("{} {} (est:{}m act:{}m)", state_icon(t.state), t.title, t.estimate_min, t.actual_min))
+        .enumerate()
+        .map(|(i, t)| {
+            let sel = if i == app.selected_index() { "▶" } else { " " };
+            format!("{} {} {} (est:{}m act:{}m)", sel, state_icon(t.state), t.title, t.estimate_min, t.actual_min)
+        })
         .collect()
 }
 
