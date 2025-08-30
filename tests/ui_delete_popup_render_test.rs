@@ -1,7 +1,7 @@
 use chute_kun::{app::App, ui};
 use crossterm::event::KeyCode;
-use ratatui::{backend::TestBackend, Terminal};
 use ratatui::style::Color;
+use ratatui::{backend::TestBackend, Terminal};
 use unicode_width::UnicodeWidthStr;
 
 // Red: 削除確認はセンタリングされたポップアップで赤色テキストが表示される
@@ -36,7 +36,7 @@ fn delete_confirmation_renders_centered_red_popup() {
     let text_x = px + 1;
     let text_y = py + 1;
 
-    let c = buf.get(text_x, text_y);
+    let c = &buf[(text_x, text_y)];
     assert_eq!(c.symbol(), "D");
     assert_eq!(c.style().fg, Some(Color::Red));
 }

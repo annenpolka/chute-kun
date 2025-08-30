@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[pre-commit] cargo fmt --check"
-cargo fmt-check
+# Capture currently staged Rust files so we can restage their formatted versions
+staged_rs=$(git diff --name-only --cached -z -- '*.rs' || true)
+
+echo "[pre-commit] cargo fmt --all (applying formatting)"
+cargo fmt --all
+
+# Restage only files that were already staged prior to formatting
+if [[ -n "${staged_rs}" ]]; then
+  echo "[pre-commit] restaging formatted files"
+  printf '%s' "${staged_rs}" | xargs -0 git add --
+fi
 
 echo "[pre-commit] cargo clippy -D warnings"
 cargo lint
@@ -13,4 +22,3 @@ if [[ -z "${SKIP_CARGO_TEST:-}" ]]; then
 else
   echo "[pre-commit] skipping cargo test due to SKIP_CARGO_TEST"
 fi
-

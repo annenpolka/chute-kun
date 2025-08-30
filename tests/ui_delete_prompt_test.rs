@@ -15,8 +15,5 @@ fn main_list_stays_while_confirm_delete() {
     app.handle_key(KeyCode::Char('x'));
     let during = ui::format_task_lines(&app);
     assert!(during[0].contains("To Delete"), "list should remain while confirming");
-    assert!(
-        !during[0].contains("Delete?"),
-        "main content should not be replaced by delete prompt"
-    );
+    assert!(!during[0].contains("Delete?"), "main content should not be replaced by delete prompt");
 }

@@ -6,7 +6,7 @@ fn header_line(buf: &ratatui::buffer::Buffer) -> String {
     let width = buf.area.width as usize;
     let mut s = String::new();
     for x in 0..width as u16 {
-        s.push_str(buf.get(x, 0).symbol());
+        s.push_str(buf[(x, 0)].symbol());
     }
     s
 }
@@ -51,4 +51,3 @@ fn header_does_not_change_while_confirm_delete() {
         after
     );
 }
-

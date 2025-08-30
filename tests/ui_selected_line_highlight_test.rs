@@ -1,5 +1,5 @@
 use chute_kun::{app::App, ui};
-use ratatui::{backend::TestBackend, style::Color, Terminal};
+use ratatui::{backend::TestBackend, Terminal};
 
 #[test]
 fn selected_line_has_background_highlight() {

@@ -2,11 +2,21 @@ use chute_kun::app::App;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
 fn press(code: KeyCode) -> KeyEvent {
-    KeyEvent { code, modifiers: KeyModifiers::empty(), kind: KeyEventKind::Press, state: KeyEventState::NONE }
+    KeyEvent {
+        code,
+        modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    }
 }
 
 fn release(code: KeyCode) -> KeyEvent {
-    KeyEvent { code, modifiers: KeyModifiers::empty(), kind: KeyEventKind::Release, state: KeyEventState::NONE }
+    KeyEvent {
+        code,
+        modifiers: KeyModifiers::empty(),
+        kind: KeyEventKind::Release,
+        state: KeyEventState::NONE,
+    }
 }
 
 #[test]
@@ -45,4 +55,3 @@ fn action_mapping_triggers_only_on_press() {
     app.handle_key_event(release(KeyCode::Char('i')));
     assert!(app.in_input_mode());
 }
-

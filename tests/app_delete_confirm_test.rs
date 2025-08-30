@@ -21,4 +21,3 @@ fn delete_confirmation_flow() {
     app.handle_key(KeyCode::Esc);
     assert_eq!(app.day.tasks.len(), 1);
 }
-

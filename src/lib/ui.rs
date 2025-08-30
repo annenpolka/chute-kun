@@ -63,35 +63,33 @@ pub fn draw(f: &mut Frame, app: &App) {
         line.spans.push(Span::raw("  (+/-5m or j/k, Enter=OK Esc=Cancel)"));
         let para = Paragraph::new(line);
         f.render_widget(para, chunks[1]);
+    } else if app.in_input_mode() {
+        // In input/command modes, render plain paragraph without row highlight
+        let lines = format_task_lines(app).join("\n");
+        let para = Paragraph::new(lines);
+        f.render_widget(para, chunks[1]);
     } else {
-        if app.in_input_mode() {
-            // In input/command modes, render plain paragraph without row highlight
-            let lines = format_task_lines(app).join("\n");
-            let para = Paragraph::new(lines);
-            f.render_widget(para, chunks[1]);
-        } else {
-            // Normal list rendering with selected-row background highlight
-            let content_lines = format_task_lines(app);
-            let mut styled: Vec<Line> = content_lines.into_iter().map(Line::from).collect();
-            let cur_len = match app.view() {
-                View::Past => app.history_tasks().len(),
-                View::Today => app.day.tasks.len(),
-                View::Future => app.tomorrow_tasks().len(),
-            };
-            if cur_len > 0 {
-                let idx = app.selected_index().min(styled.len().saturating_sub(1));
-                if let Some(line) = styled.get_mut(idx) {
-                    // Apply background to the whole line; also set each span's bg to be safe.
-                    let blue_bg = Style::default().bg(Color::Blue);
-                    line.style = blue_bg;
-                    for span in line.spans.iter_mut() {
-                        span.style = span.style.patch(blue_bg);
-                    }
+        // Normal list rendering with selected-row background highlight
+        let content_lines = format_task_lines(app);
+        let mut styled: Vec<Line> = content_lines.into_iter().map(Line::from).collect();
+        let cur_len = match app.view() {
+            View::Past => app.history_tasks().len(),
+            View::Today => app.day.tasks.len(),
+            View::Future => app.tomorrow_tasks().len(),
+        };
+        if cur_len > 0 {
+            let idx = app.selected_index().min(styled.len().saturating_sub(1));
+            if let Some(line) = styled.get_mut(idx) {
+                // Apply background to the whole line; also set each span's bg to be safe.
+                let blue_bg = Style::default().bg(Color::Blue);
+                line.style = blue_bg;
+                for span in line.spans.iter_mut() {
+                    span.style = span.style.patch(blue_bg);
                 }
             }
-            let para = Paragraph::new(styled);
-            f.render_widget(para, chunks[1]);
         }
+        let para = Paragraph::new(styled);
+        f.render_widget(para, chunks[1]);
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -106,12 +104,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     // Overlay: centered delete confirmation popup with colored text
     if app.is_confirm_delete() {
         // Compute message and popup size within the inner area
-        let title = app
-            .day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.title.as_str())
-            .unwrap_or("");
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
         let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
         let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
         let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
@@ -121,7 +114,8 @@ pub fn draw(f: &mut Frame, app: &App) {
         let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
 
         let border_style = Style::default().fg(Color::Red);
-        let title = Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
+        let title =
+            Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
         let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
         f.render_widget(Clear, popup);
         f.render_widget(block.clone(), popup);
@@ -196,12 +190,7 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
 
     // Overlay: centered delete confirmation popup with colored text
     if app.is_confirm_delete() {
-        let title = app
-            .day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.title.as_str())
-            .unwrap_or("");
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
         let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
         let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
         let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
@@ -211,7 +200,8 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
 
         let border_style = Style::default().fg(Color::Red);
-        let title = Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
+        let title =
+            Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
         let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
         f.render_widget(Clear, popup);
         f.render_widget(block.clone(), popup);
@@ -243,27 +233,14 @@ pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
     // we keep main content unchanged and render a popup overlay in `draw`.
     if app.is_estimate_editing() {
         let est = app.selected_estimate().unwrap_or(0);
-        let title = app
-            .day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.title.as_str())
-            .unwrap_or("");
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
         let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-        return vec![format!(
-            "Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)",
-            est, suffix
-        )];
+        return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
     }
     // Command palette prompt (+ show target task title)
     if app.is_command_mode() {
         let buf = app.input_buffer().unwrap_or("");
-        let title = app
-            .day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.title.as_str())
-            .unwrap_or("");
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
         let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
         return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
     }

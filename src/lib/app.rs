@@ -227,7 +227,8 @@ impl App {
             KeyCode::Char('x') => {
                 // Open delete confirmation on Today view with an existing task
                 if self.view == View::Today && !self.day.tasks.is_empty() {
-                    self.input = Some(Input { kind: InputKind::ConfirmDelete, buffer: String::new() });
+                    self.input =
+                        Some(Input { kind: InputKind::ConfirmDelete, buffer: String::new() });
                 }
             }
             KeyCode::Char('b') => {
