@@ -6,6 +6,7 @@ use crossterm::{cursor, event, execute, terminal};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use chute_kun::{app::App, ui};
+use chute_kun::config::Config;
 
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
@@ -28,6 +29,13 @@ fn main() -> Result<()> {
         .with_target(false)
         .compact()
         .init();
+
+    // Simple flag handling to initialize config and exit.
+    if std::env::args().any(|a| a == "--init-config") {
+        let path = Config::write_default_file()?;
+        println!("wrote config to {}", path.display());
+        return Ok(());
+    }
 
     let mut terminal = setup_terminal()?;
     let mut app = App::new();

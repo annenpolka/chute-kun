@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::task::{DayPlan, Task};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -37,6 +38,7 @@ pub struct App {
     view: View,
     active_accum_sec: u16,
     input: Option<Input>,
+    pub config: Config,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,7 +54,9 @@ struct Input {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new() -> Self { Self::with_config(Config::load()) }
+
+    pub fn with_config(config: Config) -> Self {
         Self {
             title: "Chute_kun".to_string(),
             should_quit: false,
@@ -63,6 +67,7 @@ impl App {
             view: View::default(),
             active_accum_sec: 0,
             input: None,
+            config,
         }
     }
 
@@ -162,10 +167,17 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, ev: KeyEvent) {
-        if ev.code == KeyCode::Enter && ev.modifiers.contains(KeyModifiers::SHIFT) {
-            self.finish_active();
+        // If in input mode, delegate to text edit handling
+        if self.in_input_mode() {
+            self.handle_key(ev.code);
             return;
         }
+        // Try config-based keymap first
+        if let Some(action) = self.config.keys.action_for(&ev) {
+            self.apply_action(action);
+            return;
+        }
+        // Fallback to legacy code-based handling to keep backward compatibility in tests
         self.handle_key(ev.code);
     }
 
@@ -184,6 +196,69 @@ impl App {
             if let Some(task) = self.day.remove(pos) {
                 self.history.push(task);
             }
+        }
+    }
+
+    fn apply_action(&mut self, action: crate::config::Action) {
+        use crate::config::Action as A;
+        match action {
+            A::Quit => {
+                self.should_quit = true;
+            }
+            A::AddTask => {
+                self.input = Some(Input { kind: InputKind::Normal, buffer: String::new() });
+            }
+            A::AddInterrupt => {
+                self.input = Some(Input { kind: InputKind::Interrupt, buffer: String::new() });
+            }
+            A::StartOrResume => {
+                if self.day.active_index().is_none() {
+                    let s = self.selected;
+                    let eligible = matches!(
+                        self.day.tasks.get(s).map(|t| t.state),
+                        Some(crate::task::TaskState::Paused | crate::task::TaskState::Planned)
+                    );
+                    if eligible {
+                        self.day.start(s);
+                    } else if let Some(idx) = (0..self.day.tasks.len()).find(|&i| {
+                        matches!(
+                            self.day.tasks[i].state,
+                            crate::task::TaskState::Paused | crate::task::TaskState::Planned
+                        )
+                    }) {
+                        self.day.start(idx);
+                        self.selected = idx;
+                    }
+                }
+            }
+            A::FinishActive => {
+                self.finish_active();
+            }
+            A::Pause => {
+                self.day.pause_active();
+            }
+            A::ReorderUp => {
+                let new = self.day.reorder_up(self.selected);
+                self.selected = new;
+            }
+            A::ReorderDown => {
+                let new = self.day.reorder_down(self.selected);
+                self.selected = new;
+            }
+            A::EstimatePlus => {
+                self.day.adjust_estimate(self.selected, 5);
+            }
+            A::Postpone => {
+                self.postpone_selected();
+            }
+            A::ViewNext => {
+                self.set_view(self.view.next());
+            }
+            A::ViewPrev => {
+                self.set_view(self.view.prev());
+            }
+            A::SelectUp => self.select_up(),
+            A::SelectDown => self.select_down(),
         }
     }
 
