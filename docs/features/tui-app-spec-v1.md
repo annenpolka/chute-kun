@@ -18,8 +18,7 @@
   - Routine ライブラリ / History（過去n日）/ Inbox
 
 ## キー操作（MVP）
-- Start/Resume: `Enter`
-- Pause: `Space`
+- Start/Pause (toggle): `Enter`
 - Finish(Complete): `Shift+Enter`
 - Navigate(選択移動): `↑/↓` または `j/k`
 - Reorder: `Alt+↑/↓`（または `[`/`]`）

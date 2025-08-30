@@ -115,8 +115,10 @@ impl App {
                 self.input = Some(Input { kind: InputKind::Interrupt, buffer: String::new() });
             }
             KeyCode::Enter => {
-                // If nothing active, start/resume the selected if eligible; else first eligible.
-                if self.day.active_index().is_none() {
+                // Toggle: if active -> pause; else start/resume selected or first eligible.
+                if self.day.active_index().is_some() {
+                    self.day.pause_active();
+                } else {
                     let s = self.selected;
                     let eligible = matches!(
                         self.day.tasks.get(s).map(|t| t.state),
@@ -212,7 +214,10 @@ impl App {
                 self.input = Some(Input { kind: InputKind::Interrupt, buffer: String::new() });
             }
             A::StartOrResume => {
-                if self.day.active_index().is_none() {
+                // Toggle behavior for Enter-mapped action: pause if active, otherwise start/resume
+                if self.day.active_index().is_some() {
+                    self.day.pause_active();
+                } else {
                     let s = self.selected;
                     let eligible = matches!(
                         self.day.tasks.get(s).map(|t| t.state),
