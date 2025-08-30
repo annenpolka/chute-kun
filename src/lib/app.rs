@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::date::today_ymd;
 use crate::task::{DayPlan, Task};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum View {
@@ -230,6 +230,11 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, ev: KeyEvent) {
+        // Only act on key press/repeat; ignore key release to avoid double-handling
+        // on terminals reporting event types (iTerm2, Ghostty, etc.).
+        if matches!(ev.kind, KeyEventKind::Release) {
+            return;
+        }
         // If in input mode, delegate to text edit handling
         if self.in_input_mode() {
             self.handle_key(ev.code);

@@ -24,6 +24,9 @@
 4. ターミナル設定の確認
    - 一部設定（全てのキーをエスケープとして送る等）では IME 入力が壊れることがあります
    - 本アプリは IME 互換性を優先するフラグ構成で動作します（詳細は ADR-004）
+5. iTerm2/Ghostty で二重入力になる
+   - これらのターミナルはキーボード拡張で Press/Release の両方を報告します
+   - アプリ側は `KeyEventKind::Release` を無視するよう対応済み（バージョンを最新に更新してください）
 
 ## 実装メモ（開発者向け）
 - キーボード拡張フラグ: `DISAMBIGUATE_ESCAPE_CODES | REPORT_EVENT_TYPES` のみ有効化
@@ -32,4 +35,3 @@
 - テスト: `tests/app_japanese_input_test.rs` に日本語入力・削除・貼り付けの検証を追加
 
 関連: `docs/adr/ADR-004-Keyboard-Enhancement-IME-Compatibility.md`
-
