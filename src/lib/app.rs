@@ -438,6 +438,9 @@ impl App {
                         Some(2) => self.set_view(View::Future),
                         _ => {}
                     }
+                    // View change can shift list area (different banner/help height). Re-align hover
+                    let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                    self.update_hover_from_coords(ev.column, ev.row, list2);
                     return;
                 }
                 // List click
@@ -462,6 +465,10 @@ impl App {
                     self.last_click =
                         Some(LastClick { when: now, index: idx, button: MouseButton::Left });
                 }
+                // Starting/pausing can add/remove the active banner which shifts list Y by ±1.
+                // Recompute hover using the current coordinates against the new layout.
+                let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                self.update_hover_from_coords(ev.column, ev.row, list2);
             }
             MouseEventKind::Down(MouseButton::Right) => {
                 // Right click opens estimate editor on the clicked row
@@ -474,6 +481,9 @@ impl App {
                     self.input =
                         Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
+                // Popups don't affect list geometry, but realign hover defensively.
+                let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                self.update_hover_from_coords(ev.column, ev.row, list2);
             }
             _ => {}
         }
