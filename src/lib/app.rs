@@ -370,6 +370,9 @@ impl App {
     pub fn is_estimate_editing(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::EstimateEdit))
     }
+    pub fn is_command_mode(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::Command))
+    }
     pub fn selected_estimate(&self) -> Option<u16> {
         self.day.tasks.get(self.selected).map(|t| t.estimate_min)
     }
