@@ -8,8 +8,10 @@
 
 ## 画面構成
 - ヘッダ: `YYYY-MM-DD (曜日) 現在時刻 | 見積合計/実績合計 | 見込み終了時刻 | 余裕(±分)`
-- メインリスト（Today Queue）:
-  - 表示列: `[state] title  est  act  ▲▽(順序)  ETA`（state: planned/active/paused/done）
+- メインリスト（Today Queue／ratatui::Table）:
+  - 左から順にカラム: `Plan(予定時刻)` / `Actual(実測ログ)` / `Task(状態+タイトル+見積/実績)`
+  - `Actual` は `HH:MM-HH:MM, ...` のセッション列をフルで表示（幅内で省略あり）
+  - 選択行は行背景でハイライト
   - フィルタ: セクション/プロジェクト/ラベル
 - 詳細ペイン（トグル）:
   - タスク詳細: 説明、ラベル、プロジェクト/セクション
