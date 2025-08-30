@@ -45,6 +45,52 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<std::io::Stdout>>) -
     Ok(())
 }
 
+// ---- Helpers for CLI-only features ----
+
+fn parse_hhmm(s: &str) -> Result<(u8, u8), String> {
+    let mut it = s.split(':');
+    let h = it
+        .next()
+        .ok_or_else(|| "invalid time format, expected HH:MM".to_string())?
+        .parse::<u8>()
+        .map_err(|_| "invalid hour".to_string())?;
+    let m = it
+        .next()
+        .ok_or_else(|| "invalid time format, expected HH:MM".to_string())?
+        .parse::<u8>()
+        .map_err(|_| "invalid minute".to_string())?;
+    if it.next().is_some() {
+        return Err("invalid time format, expected HH:MM".to_string());
+    }
+    if h > 23 || m > 59 {
+        return Err("time out of range".to_string());
+    }
+    Ok((h, m))
+}
+
+fn set_day_start_in_toml(contents: &str, hhmm: &str) -> String {
+    let mut replaced = false;
+    let mut out = String::with_capacity(contents.len() + 32);
+    for line in contents.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("day_start") {
+            // Replace the whole line regardless of spacing/comments
+            out.push_str(&format!("day_start = \"{}\"\n", hhmm));
+            replaced = true;
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if !replaced {
+        let mut inserted = String::new();
+        inserted.push_str(&format!("day_start = \"{}\"\n", hhmm));
+        inserted.push_str(&out);
+        return inserted;
+    }
+    out
+}
+
 fn main() -> Result<()> {
     color_eyre::install().ok();
     tracing_subscriber::fmt()
@@ -58,6 +104,33 @@ fn main() -> Result<()> {
         let path = Config::write_default_file()?;
         println!("wrote config to {}", path.display());
         return Ok(());
+    }
+
+    // Optional: set day_start value and exit (persistent).
+    // Usage: --set-day-start HH:MM
+    // This updates the `day_start = "HH:MM"` line in the config TOML,
+    // creating the config file if it does not exist.
+    {
+        let mut args = std::env::args().skip(1);
+        while let Some(a) = args.next() {
+            if a == "--set-day-start" {
+                let Some(val) = args.next() else {
+                    eprintln!("--set-day-start requires a value like HH:MM");
+                    std::process::exit(2);
+                };
+                // Validate and normalize value
+                let (hh, mm) = parse_hhmm(&val).map_err(|e| anyhow::anyhow!(e))?;
+                let normalized = format!("{:02}:{:02}", hh, mm);
+
+                let path = Config::write_default_file()?; // ensure file exists / resolve path
+                let contents =
+                    std::fs::read_to_string(&path).unwrap_or_else(|_| Config::default_toml());
+                let updated = set_day_start_in_toml(&contents, &normalized);
+                std::fs::write(&path, updated)?;
+                println!("updated day_start to {} at {}", normalized, path.display());
+                return Ok(());
+            }
+        }
     }
 
     // Optional state path override: --state <path>

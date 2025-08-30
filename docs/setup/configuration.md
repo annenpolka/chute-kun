@@ -37,6 +37,8 @@ select_down = ["Down", "j"]
 
 **使い方**
 - 初期化: `chute_kun --init-config`（または `CHUTE_KUN_CONFIG=/path/to/config.toml chute_kun --init-config`）。
+- 変更（予定基準時間）: `chute_kun --set-day-start HH:MM`
+  - `CHUTE_KUN_CONFIG` が設定されていればそのパスを、なければ既定の config.toml を作成/更新します。
 - 実行時: ファイルが存在すれば自動読み込み。存在しない場合はデフォルト（09:00 と既定キー）。
 
 **注意**
