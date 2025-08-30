@@ -351,3 +351,16 @@ impl App {
         }
     }
 }
+
+impl App {
+    /// Replace task lists from an external snapshot.
+    /// - Resets selection and carry seconds; keeps config.
+    pub fn apply_snapshot(&mut self, today: Vec<crate::task::Task>, future: Vec<crate::task::Task>, past: Vec<crate::task::Task>) {
+        self.day = DayPlan::new(today);
+        self.tomorrow = future;
+        self.history = past;
+        self.selected = 0;
+        self.active_accum_sec = 0;
+        self.set_view(View::Today);
+    }
+}
