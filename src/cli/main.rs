@@ -2,6 +2,7 @@ use std::io::stdout;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::event::{
     KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
@@ -15,7 +16,7 @@ use chute_kun::{app::App, ui};
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
     // Enter alternate screen + hide cursor first
-    execute!(stdout(), terminal::EnterAlternateScreen, cursor::Hide)?;
+    execute!(stdout(), terminal::EnterAlternateScreen, cursor::Hide, EnableMouseCapture)?;
     // Try to enable progressive keyboard enhancement so modifiers like Shift+Enter are reported.
     // NOTE: Avoid REPORT_ALL_KEYS_AS_ESCAPE_CODES because crossterm cannot yet decode
     // Unicode code points for CSI-u mode, which breaks IME (e.g., Japanese) input.
@@ -34,7 +35,12 @@ fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
 fn restore_terminal(mut terminal: Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<()> {
     // Best-effort pop keyboard enhancement flags if they were pushed
     let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
-    execute!(terminal.backend_mut(), terminal::LeaveAlternateScreen, cursor::Show)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableMouseCapture,
+        terminal::LeaveAlternateScreen,
+        cursor::Show
+    )?;
     terminal::disable_raw_mode()?;
     Ok(())
 }
@@ -101,6 +107,11 @@ fn main() -> Result<()> {
             match event::read()? {
                 event::Event::Key(k) => app.handle_key_event(k),
                 event::Event::Paste(s) => app.handle_paste(&s),
+                event::Event::Mouse(m) => {
+                    let sz = terminal.size()?; // ratatui::prelude::Size
+                    let area = ratatui::layout::Rect::new(0, 0, sz.width, sz.height);
+                    app.handle_mouse_event(m, area);
+                }
                 _ => {}
             }
         }

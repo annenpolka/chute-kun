@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Clear, Paragraph, Tabs, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -40,14 +40,8 @@ pub fn draw(f: &mut Frame, app: &App) {
     let chunks =
         Layout::default().direction(Direction::Vertical).constraints(constraints).split(inner);
 
-    // Tabs for date views
-    let (titles, selected) = tab_titles(app);
-    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
-    let tabs = Tabs::new(titles)
-        .select(selected)
-        .highlight_style(Style::default().fg(Color::Yellow))
-        .divider(Span::raw("│"));
-    f.render_widget(tabs, chunks[0]);
+    // Tabs for date views (custom-rendered to support hover + precise hitboxes)
+    render_tabs_line(f, chunks[0], app);
 
     // If we have an active banner, render it right below tabs
     let mut content_idx = 1usize; // index into chunks for main content
@@ -91,11 +85,23 @@ pub fn draw(f: &mut Frame, app: &App) {
         if cur_len > 0 {
             let idx = app.selected_index().min(styled.len().saturating_sub(1));
             if let Some(line) = styled.get_mut(idx) {
-                // Apply background to the whole line; also set each span's bg to be safe.
-                let blue_bg = Style::default().bg(Color::Blue);
-                line.style = blue_bg;
+                let bg = Style::default().bg(Color::Blue);
+                line.style = bg;
                 for span in line.spans.iter_mut() {
-                    span.style = span.style.patch(blue_bg);
+                    span.style = span.style.patch(bg);
+                }
+            }
+            // Hovered row (if any and different) gets Cyan background
+            if let Some(h) = app.hovered_index() {
+                if h != idx {
+                    let h_idx = h.min(styled.len().saturating_sub(1));
+                    if let Some(line) = styled.get_mut(h_idx) {
+                        let bg = Style::default().bg(Color::Cyan);
+                        line.style = bg;
+                        for span in line.spans.iter_mut() {
+                            span.style = span.style.patch(bg);
+                        }
+                    }
                 }
             }
         }
@@ -114,27 +120,166 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(help, chunks[help_idx]);
     }
 
-    // Overlay: centered delete confirmation popup with colored text
-    if app.is_confirm_delete() {
-        // Compute message and popup size within the inner area
-        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-        let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
-        let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
-        let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
-        let popup_h: u16 = 3;
-        let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
-        let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
-        let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
+    // Overlay: centered estimate editor popup (styled buttons)
+    if let Some(popup) = compute_estimate_popup_rect(app, area) {
+        let border = Style::default().fg(Color::Yellow);
+        let title_line =
+            Line::from(Span::styled(" Estimate ", border.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner = block.inner(popup);
+        let msg = {
+            let t = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+            format!("Estimate: {}m — {}", app.selected_estimate().unwrap_or(0), t)
+        };
+        let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+        f.render_widget(
+            Paragraph::new(Span::styled(msg, Style::default().fg(Color::Yellow))),
+            msg_rect,
+        );
+        let (minus, plus, ok, cancel) = estimate_popup_button_hitboxes(app, popup);
+        let btn_y = minus.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad = (minus.x.saturating_sub(inner.x)) as usize;
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        let minus_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstMinus)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("-5m".to_string(), minus_style));
+        let gap1 = plus.x.saturating_sub(minus.x + minus.width) as usize;
+        if gap1 > 0 {
+            spans.push(Span::raw(" ".repeat(gap1)));
+        }
+        let plus_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstPlus)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("+5m".to_string(), plus_style));
+        let gap2 = ok.x.saturating_sub(plus.x + plus.width) as usize;
+        if gap2 > 0 {
+            spans.push(Span::raw(" ".repeat(gap2)));
+        }
+        let ok_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstOk)) {
+            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Black).bg(Color::Blue).add_modifier(Modifier::BOLD)
+        };
+        spans.push(Span::styled("OK".to_string(), ok_style));
+        let gap3 = cancel.x.saturating_sub(ok.x + ok.width) as usize;
+        if gap3 > 0 {
+            spans.push(Span::raw(" ".repeat(gap3)));
+        }
+        let cancel_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstCancel)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Cancel".to_string(), cancel_style));
+        let btn_rect = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
+    }
 
+    // Overlay: centered input popup (styled buttons)
+    if let Some(popup) = compute_input_popup_rect(app, area) {
+        let border = Style::default().fg(Color::Cyan);
+        let title_line =
+            Line::from(Span::styled(" New Task ", border.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner = block.inner(popup);
+        let buf = app.input_buffer().unwrap_or("");
+        let msg = format!("Title: {} _", buf);
+        let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+        f.render_widget(
+            Paragraph::new(Span::styled(msg, Style::default().fg(Color::Cyan))),
+            msg_rect,
+        );
+        let (add, cancel) = input_popup_button_hitboxes(app, popup);
+        let btn_y = add.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad = (add.x.saturating_sub(inner.x)) as usize;
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        let add_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::InputAdd)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Add".to_string(), add_style));
+        let gap = cancel.x.saturating_sub(add.x + add.width) as usize;
+        if gap > 0 {
+            spans.push(Span::raw(" ".repeat(gap)));
+        }
+        let cancel_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::InputCancel)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Cancel".to_string(), cancel_style));
+        let btn_rect = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
+    }
+
+    // Overlay: centered delete confirmation popup with colored text + styled buttons
+    if app.is_confirm_delete() {
+        let popup = compute_delete_popup_rect(app, area).unwrap();
         let border_style = Style::default().fg(Color::Red);
-        let title =
+        let title_line =
             Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
-        let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
+        let block =
+            Block::default().borders(Borders::ALL).title(title_line).border_style(border_style);
         f.render_widget(Clear, popup);
         f.render_widget(block.clone(), popup);
         let inner_popup = block.inner(popup);
-        let para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
-        f.render_widget(para, inner_popup);
+        // First inner line: red message
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+        let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
+        let msg_para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
+        let msg_rect =
+            Rect { x: inner_popup.x, y: inner_popup.y, width: inner_popup.width, height: 1 };
+        f.render_widget(msg_para, msg_rect);
+        // Second inner line: pill-styled buttons aligned with hitboxes
+        let (del_rect, cancel_rect) = delete_popup_button_hitboxes(app, popup);
+        let btn_y = del_rect.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad_del = (del_rect.x.saturating_sub(inner_popup.x)) as usize;
+        if pad_del > 0 {
+            spans.push(Span::raw(" ".repeat(pad_del)));
+        }
+        let del_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::Delete))
+        {
+            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Black).bg(Color::Red).add_modifier(Modifier::BOLD)
+        };
+        spans.push(Span::styled("Delete".to_string(), del_style));
+        let gap = cancel_rect.x.saturating_sub(del_rect.x + del_rect.width) as usize;
+        if gap > 0 {
+            spans.push(Span::raw(" ".repeat(gap)));
+        }
+        let can_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::Cancel))
+        {
+            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+        };
+        spans.push(Span::styled("Cancel".to_string(), can_style));
+        let btn_line = Paragraph::new(Line::from(spans));
+        let btn_rect = Rect { x: inner_popup.x, y: btn_y, width: inner_popup.width, height: 1 };
+        f.render_widget(btn_line, btn_rect);
     }
 }
 
@@ -166,13 +311,7 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     let chunks =
         Layout::default().direction(Direction::Vertical).constraints(constraints).split(inner);
 
-    let (titles, selected) = tab_titles(app);
-    let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
-    let tabs = Tabs::new(titles)
-        .select(selected)
-        .highlight_style(Style::default().fg(Color::Yellow))
-        .divider(Span::raw("│"));
-    f.render_widget(tabs, chunks[0]);
+    render_tabs_line(f, chunks[0], app);
 
     // Optional banner under tabs
     let mut content_idx = 1usize;
@@ -194,6 +333,14 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         let idx = app.selected_index().min(styled.len().saturating_sub(1));
         if let Some(line) = styled.get_mut(idx) {
             line.style = Style::default().bg(Color::Blue);
+        }
+        if let Some(h) = app.hovered_index() {
+            if h != idx {
+                let h_idx = h.min(styled.len().saturating_sub(1));
+                if let Some(line) = styled.get_mut(h_idx) {
+                    line.style = Style::default().bg(Color::Cyan);
+                }
+            }
         }
     }
     let para = Paragraph::new(styled);
@@ -229,7 +376,7 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         f.render_widget(Clear, popup);
         f.render_widget(block.clone(), popup);
         let inner_popup = block.inner(popup);
-        let para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
+        let para = Paragraph::new(Span::styled(msg.clone(), Style::default().fg(Color::Red)));
         f.render_widget(para, inner_popup);
     }
 }
@@ -512,4 +659,203 @@ pub fn format_active_banner(app: &App) -> Option<Line<'static>> {
         t.estimate_min, t.actual_min, t.actual_carry_sec
     )));
     Some(line)
+}
+
+fn render_tabs_line(f: &mut Frame, rect: Rect, app: &App) {
+    let (titles, selected) = tab_titles(app);
+    let hover = app.hovered_tab_index();
+    let mut line = Line::default();
+    for (i, title) in titles.iter().enumerate() {
+        let mut style = Style::default();
+        if Some(i) == hover && Some(i) != Some(selected) {
+            style = style.fg(Color::Cyan);
+        }
+        if i == selected {
+            style = style.fg(Color::Yellow).add_modifier(Modifier::BOLD);
+        }
+        line.spans.push(Span::styled(title.clone(), style));
+        if i + 1 != titles.len() {
+            line.spans.push(Span::styled("│".to_string(), Style::default().fg(Color::DarkGray)));
+        }
+    }
+    let para = Paragraph::new(line);
+    f.render_widget(para, rect);
+}
+
+/// Compute hitboxes for tab titles inside the `tabs_rect`.
+pub fn tab_hitboxes(app: &App, tabs_rect: Rect) -> Vec<Rect> {
+    let (titles, _sel) = tab_titles(app);
+    let mut xs = tabs_rect.x;
+    let mut boxes = Vec::with_capacity(titles.len());
+    for (i, t) in titles.iter().enumerate() {
+        let w = UnicodeWidthStr::width(t.as_str()) as u16;
+        let r = Rect { x: xs, y: tabs_rect.y, width: w.max(1), height: 1 };
+        boxes.push(r);
+        xs = xs.saturating_add(w);
+        if i + 1 != titles.len() {
+            // account for divider "│"
+            xs = xs.saturating_add(1);
+        }
+    }
+    boxes
+}
+
+pub fn compute_delete_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_confirm_delete() {
+        return None;
+    }
+    // Reconstruct inner same as draw
+    let area: Rect = area;
+    let header_line = header_title_line(app_display_base(app), app);
+    let block = Block::default().title(header_line).borders(Borders::ALL);
+    let inner = block.inner(area);
+    // Message content identical to draw
+    let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+    let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
+    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
+    let popup_h: u16 = 4;
+    let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+    let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+    Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
+pub fn delete_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
+    // Buttons are rendered on the second inner line, left-aligned, separated by two spaces
+    let inner_popup = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
+    let btn_y = inner_popup.y + 1;
+    let del_w = UnicodeWidthStr::width("Delete") as u16;
+    let can_w = UnicodeWidthStr::width("Cancel") as u16;
+    let total = del_w + 2 + can_w;
+    let start_x = inner_popup.x + (inner_popup.width.saturating_sub(total)) / 2;
+    let del_rect = Rect { x: start_x, y: btn_y, width: del_w, height: 1 };
+    let can_x = start_x + del_w + 2;
+    let cancel_rect = Rect { x: can_x, y: btn_y, width: can_w, height: 1 };
+    (del_rect, cancel_rect)
+}
+
+// Estimate popup
+pub fn compute_estimate_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_estimate_editing() {
+        return None;
+    }
+    let block =
+        Block::default().title(header_title_line(app_display_base(app), app)).borders(Borders::ALL);
+    let inner = block.inner(area);
+    let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+    let msg = format!("Estimate: {}m — {}", app.selected_estimate().unwrap_or(0), title);
+    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let popup_w = content_w.saturating_add(4).min(inner.width).max(30).min(inner.width);
+    let popup_h: u16 = 4; // message + buttons line
+    let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+    let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+    Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
+pub fn estimate_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect, Rect) {
+    let inner = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
+    let y = inner.y + 1;
+    let m_w = UnicodeWidthStr::width("-5m") as u16;
+    let p_w = UnicodeWidthStr::width("+5m") as u16;
+    let ok_w = UnicodeWidthStr::width("OK") as u16;
+    let ca_w = UnicodeWidthStr::width("Cancel") as u16;
+    let total = m_w + 2 + p_w + 2 + ok_w + 2 + ca_w;
+    let start_x = inner.x + (inner.width.saturating_sub(total)) / 2;
+    let minus = Rect { x: start_x, y, width: m_w, height: 1 };
+    let plus = Rect { x: start_x + m_w + 2, y, width: p_w, height: 1 };
+    let ok = Rect { x: plus.x + p_w + 2, y, width: ok_w, height: 1 };
+    let cancel = Rect { x: ok.x + ok_w + 2, y, width: ca_w, height: 1 };
+    (minus, plus, ok, cancel)
+}
+
+// Input popup (Normal/Interrupt)
+pub fn compute_input_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !(app.is_text_input_mode()) {
+        return None;
+    }
+    let block =
+        Block::default().title(header_title_line(app_display_base(app), app)).borders(Borders::ALL);
+    let inner = block.inner(area);
+    let buf = app.input_buffer().unwrap_or("");
+    let msg = format!("Title: {} _", buf);
+    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let popup_w = content_w.saturating_add(4).min(inner.width).max(30).min(inner.width);
+    let popup_h: u16 = 4; // message + buttons
+    let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+    let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+    Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
+pub fn input_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
+    let inner = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
+    let y = inner.y + 1;
+    let add_w = UnicodeWidthStr::width("Add") as u16;
+    let ca_w = UnicodeWidthStr::width("Cancel") as u16;
+    let total = add_w + 2 + ca_w;
+    let start_x = inner.x + (inner.width.saturating_sub(total)) / 2;
+    let add = Rect { x: start_x, y, width: add_w, height: 1 };
+    let cancel = Rect { x: start_x + add_w + 2, y, width: ca_w, height: 1 };
+    (add, cancel)
+}
+
+// note: helpers that parsed message text for positions were removed in favor of
+// explicit hitbox geometry to reduce dead code and simplify clippy compliance.
+
+/// Compute key layout rectangles used by `draw`, for hit testing and tests.
+/// Returns (tabs, optional active banner, list/content, help) within the inner bordered area.
+pub fn compute_layout(app: &App, area: Rect) -> (Rect, Option<Rect>, Rect, Rect) {
+    // Replicate the same sizing logic as `draw`.
+    // First, account for the outer Block's borders.
+    let inner = Rect {
+        x: area.x.saturating_add(1),
+        y: area.y.saturating_add(1),
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+
+    // Help height depends on wrapping for the current width
+    let help_lines = help_lines_for_width(app, inner.width.max(1));
+    let mut help_height = help_lines.len() as u16;
+    let max_help = inner.height.saturating_sub(2); // tabs + list(>=1)
+    if max_help > 0 {
+        help_height = help_height.min(max_help);
+    }
+    help_height = help_height.max(1);
+
+    // Optional active banner allocates one line under tabs
+    let has_banner = format_active_banner(app).is_some();
+    let tabs = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+    let mut y = inner.y + 1;
+    let banner = if has_banner {
+        let b = Rect { x: inner.x, y, width: inner.width, height: 1 };
+        y += 1;
+        Some(b)
+    } else {
+        None
+    };
+    // List/content takes remaining minus help
+    let list_height = inner.height.saturating_sub(y - inner.y).saturating_sub(help_height);
+    let list = Rect { x: inner.x, y, width: inner.width, height: list_height };
+    let help = Rect {
+        x: inner.x,
+        y: inner.y + inner.height.saturating_sub(help_height),
+        width: inner.width,
+        height: help_height,
+    };
+    (tabs, banner, list, help)
 }
