@@ -4,11 +4,11 @@ pub mod app;
 pub mod clock;
 #[path = "lib/config.rs"]
 pub mod config;
+#[path = "lib/date.rs"]
+pub mod date;
+#[path = "lib/storage.rs"]
+pub mod storage;
 #[path = "lib/task.rs"]
 pub mod task;
 #[path = "lib/ui.rs"]
 pub mod ui;
-#[path = "lib/storage.rs"]
-pub mod storage;
-#[path = "lib/date.rs"]
-pub mod date;

@@ -1,4 +1,4 @@
-use chute_kun::config::{Config, Action};
+use chute_kun::config::{Action, Config};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[test]
@@ -8,4 +8,3 @@ fn default_keymap_maps_f_to_finish() {
     let act = cfg.keys.action_for(&ev);
     assert!(matches!(act, Some(Action::FinishActive)), "expected FinishActive, got: {:?}", act);
 }
-

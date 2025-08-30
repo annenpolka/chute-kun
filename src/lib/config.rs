@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::Deserialize;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -200,7 +200,7 @@ enum OneOrMany {
 }
 
 impl OneOrMany {
-    fn to_vec(self) -> Vec<String> {
+    fn into_vec(self) -> Vec<String> {
         match self {
             OneOrMany::One(s) => vec![s],
             OneOrMany::Many(v) => v,
@@ -229,27 +229,57 @@ impl Config {
             let mut km = KeyMap::default();
             let apply = |dst: &mut Vec<KeySpec>, src: OneOrMany| -> Result<()> {
                 *dst = src
-                    .to_vec()
+                    .into_vec()
                     .into_iter()
                     .map(|s| KeySpec::parse(&s))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(())
             };
-            if let Some(v) = keys.quit { apply(&mut km.quit, v)?; }
-            if let Some(v) = keys.add_task { apply(&mut km.add_task, v)?; }
-            if let Some(v) = keys.add_interrupt { apply(&mut km.add_interrupt, v)?; }
-            if let Some(v) = keys.start_or_resume { apply(&mut km.start_or_resume, v)?; }
-            if let Some(v) = keys.finish_active { apply(&mut km.finish_active, v)?; }
-            if let Some(v) = keys.pause { apply(&mut km.pause, v)?; }
-            if let Some(v) = keys.reorder_up { apply(&mut km.reorder_up, v)?; }
-            if let Some(v) = keys.reorder_down { apply(&mut km.reorder_down, v)?; }
-            if let Some(v) = keys.estimate_plus { apply(&mut km.estimate_plus, v)?; }
-            if let Some(v) = keys.postpone { apply(&mut km.postpone, v)?; }
-            if let Some(v) = keys.bring_to_today { apply(&mut km.bring_to_today, v)?; }
-            if let Some(v) = keys.view_next { apply(&mut km.view_next, v)?; }
-            if let Some(v) = keys.view_prev { apply(&mut km.view_prev, v)?; }
-            if let Some(v) = keys.select_up { apply(&mut km.select_up, v)?; }
-            if let Some(v) = keys.select_down { apply(&mut km.select_down, v)?; }
+            if let Some(v) = keys.quit {
+                apply(&mut km.quit, v)?;
+            }
+            if let Some(v) = keys.add_task {
+                apply(&mut km.add_task, v)?;
+            }
+            if let Some(v) = keys.add_interrupt {
+                apply(&mut km.add_interrupt, v)?;
+            }
+            if let Some(v) = keys.start_or_resume {
+                apply(&mut km.start_or_resume, v)?;
+            }
+            if let Some(v) = keys.finish_active {
+                apply(&mut km.finish_active, v)?;
+            }
+            if let Some(v) = keys.pause {
+                apply(&mut km.pause, v)?;
+            }
+            if let Some(v) = keys.reorder_up {
+                apply(&mut km.reorder_up, v)?;
+            }
+            if let Some(v) = keys.reorder_down {
+                apply(&mut km.reorder_down, v)?;
+            }
+            if let Some(v) = keys.estimate_plus {
+                apply(&mut km.estimate_plus, v)?;
+            }
+            if let Some(v) = keys.postpone {
+                apply(&mut km.postpone, v)?;
+            }
+            if let Some(v) = keys.bring_to_today {
+                apply(&mut km.bring_to_today, v)?;
+            }
+            if let Some(v) = keys.view_next {
+                apply(&mut km.view_next, v)?;
+            }
+            if let Some(v) = keys.view_prev {
+                apply(&mut km.view_prev, v)?;
+            }
+            if let Some(v) = keys.select_up {
+                apply(&mut km.select_up, v)?;
+            }
+            if let Some(v) = keys.select_down {
+                apply(&mut km.select_down, v)?;
+            }
             cfg.keys = km;
         }
         Ok(cfg)
@@ -315,7 +345,9 @@ select_down = ["Down", "j"]
         } else {
             default_config_path().ok_or_else(|| anyhow!("could not resolve config path"))?
         };
-        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent).ok(); }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
         if !path.exists() {
             std::fs::write(&path, Self::default_toml()).context("write default config")?;
         }

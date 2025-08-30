@@ -23,4 +23,3 @@ fn enter_toggles_start_and_pause() {
     assert_eq!(app.day.tasks[0].state, TaskState::Active);
     assert_eq!(app.day.active_index(), Some(0));
 }
-

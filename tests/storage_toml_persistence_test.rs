@@ -43,10 +43,7 @@ fn snapshot_roundtrip_preserves_lists_and_states() {
     // Future: one task (B) Planned
     assert_eq!(loaded.tomorrow_tasks().len(), 1);
     assert_eq!(loaded.tomorrow_tasks()[0].title, "B");
-    assert!(matches!(
-        loaded.tomorrow_tasks()[0].state,
-        chute_kun::task::TaskState::Planned
-    ));
+    assert!(matches!(loaded.tomorrow_tasks()[0].state, chute_kun::task::TaskState::Planned));
 
     // Past: one task (A) Done
     assert_eq!(loaded.history_tasks().len(), 1);

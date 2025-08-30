@@ -15,4 +15,3 @@ fn task_line_shows_seconds_while_paused() {
     let row = lines.iter().find(|l| l.contains("A")).expect("row for A");
     assert!(row.contains("act:0m 59s"), "row: {}", row);
 }
-

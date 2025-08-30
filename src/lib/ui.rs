@@ -229,12 +229,7 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
     let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
     let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
     // 正攻法: 全タスクの部分秒を合算
-    let carry_sec: u32 = app
-        .day
-        .tasks
-        .iter()
-        .map(|t| t.actual_carry_sec as u32)
-        .sum();
+    let carry_sec: u32 = app.day.tasks.iter().map(|t| t.actual_carry_sec as u32).sum();
 
     let total_act_sec = total_act_min * 60 + carry_sec;
     let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
@@ -293,7 +288,9 @@ pub fn help_items_for(app: &App) -> Vec<&'static str> {
 /// This uses Unicode width to count display cells.
 pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
     let width = width as usize;
-    if width == 0 { return vec![String::new()]; }
+    if width == 0 {
+        return vec![String::new()];
+    }
     let mut lines: Vec<String> = Vec::new();
     let mut cur = String::new();
     let sep = " | ";
@@ -323,4 +320,6 @@ pub fn help_lines_for_width(app: &App, width: u16) -> Vec<String> {
     wrap_help_items_to_width(&items, width)
 }
 
-fn app_display_base(app: &App) -> u16 { app.config.day_start_minutes }
+fn app_display_base(app: &App) -> u16 {
+    app.config.day_start_minutes
+}

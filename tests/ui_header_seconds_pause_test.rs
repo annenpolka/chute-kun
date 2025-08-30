@@ -18,4 +18,3 @@ fn header_shows_seconds_while_paused() {
     let header = format_header_line(9 * 60, &app);
     assert!(header.contains("Act 0m 59s"), "header: {}", header);
 }
-

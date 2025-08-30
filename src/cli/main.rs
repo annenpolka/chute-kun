@@ -2,13 +2,15 @@ use std::io::stdout;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use crossterm::event::{
+    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+};
 use crossterm::{cursor, event, execute, terminal};
-use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags, PopKeyboardEnhancementFlags};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use chute_kun::{app::App, ui};
 use chute_kun::config::Config;
 use chute_kun::storage;
+use chute_kun::{app::App, ui};
 
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
@@ -71,7 +73,7 @@ fn main() -> Result<()> {
     // Load config and state snapshot (if found) from XDG data path or override.
     let cfg = Config::load();
     let chosen_path = state_path_override
-        .or_else(|| storage::default_state_path())
+        .or_else(storage::default_state_path)
         .expect("could not resolve default state path");
 
     let mut app = match storage::load_from_path(&chosen_path, cfg.clone())? {

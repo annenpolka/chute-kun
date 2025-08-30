@@ -21,4 +21,3 @@ fn header_totals_sum_carry_seconds_across_tasks() {
     let header = format_header_line(9 * 60, &app);
     assert!(header.contains("Act 1m 29s"), "header: {}", header);
 }
-

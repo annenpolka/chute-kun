@@ -15,4 +15,3 @@ fn xdg_data_home_env_is_used_when_set() {
     let path = default_state_path().expect("resolved path");
     assert_eq!(path, expected);
 }
-
