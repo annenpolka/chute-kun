@@ -60,46 +60,8 @@ pub fn draw(f: &mut Frame, app: &App) {
         content_idx = 2;
     }
 
-    // Main content: if in estimate edit, render a styled line with highlighted minutes
-    if app.is_estimate_editing() {
-        let est = app.selected_estimate().unwrap_or(0);
-        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-        let mut line = Line::default();
-        line.spans.push(Span::raw("Estimate: "));
-        line.spans.push(Span::styled(
-            format!("{}m", est),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ));
-        if !title.is_empty() {
-            line.spans.push(Span::raw(" — "));
-            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
-        }
-        line.spans.push(Span::raw("  (←/→ or j/k to adjust; click slider; Enter=OK Esc=Cancel)"));
-        let para = Paragraph::new(line);
-        f.render_widget(para, chunks[content_idx]);
-    } else if app.is_new_task_estimate() {
-        // Show a single-line prompt for slider-based estimate input
-        let mut line = Line::default();
-        let est = app
-            .input_buffer()
-            .and_then(|s| s.parse::<u16>().ok())
-            .or_else(|| app.new_task_default_estimate())
-            .unwrap_or(25);
-        line.spans.push(Span::raw("Estimate: "));
-        line.spans.push(Span::styled(
-            format!("{}m", est),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ));
-        if let Some(title) = app.new_task_title() {
-            line.spans.push(Span::raw(" — "));
-            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
-        }
-        line.spans
-            .push(Span::raw("  (←/→ or j/k to adjust; click/drag slider; Enter=OK Esc=Cancel)"));
-        let para = Paragraph::new(line);
-        f.render_widget(para, chunks[content_idx]);
-    } else if app.in_input_mode() {
-        // In input/command modes, render plain paragraph without row highlight
+    // Main content: keep task list/table; only command palette uses inline prompt
+    if app.is_command_mode() {
         let lines = format_task_lines(app).join("\n");
         let para = Paragraph::new(lines);
         f.render_widget(para, chunks[content_idx]);
@@ -438,32 +400,14 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
 
 // Deterministic variant for tests: inject current minutes since midnight.
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
-    // Show specialized prompts only for relevant modes. For delete confirmation
-    // we keep main content unchanged and render a popup overlay in `draw`.
-    if app.is_estimate_editing() {
-        let est = app.selected_estimate().unwrap_or(0);
-        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-        return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
-    }
-    // Command palette prompt (+ show target task title)
+    // Command palette prompt (+ show target task title). Other popups keep main content.
     if app.is_command_mode() {
         let buf = app.input_buffer().unwrap_or("");
         let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
         let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
         return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
     }
-    if app.is_new_task_estimate() {
-        let buf = app.input_buffer().unwrap_or("");
-        let title = app.new_task_title().unwrap_or("");
-        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-        return vec![format!("Estimate (min): {} _{}  (Enter=OK Esc=Cancel)", buf, suffix)];
-    }
-    // Input mode (Normal/Interrupt) prompt only when not in delete confirm
-    if app.in_input_mode() && !app.is_confirm_delete() {
-        let buf = app.input_buffer().unwrap_or("");
-        return vec![format!("Input: {} _  (Enter=OK Esc=Cancel)", buf)];
-    }
+    // For estimate edit/new-task estimate/title input/delete confirm, keep main list lines
     match app.view() {
         View::Past => render_list_slice(now_min, app, app.history_tasks()),
         View::Today => render_list_slice(now_min, app, &app.day.tasks),
