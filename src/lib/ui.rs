@@ -159,6 +159,17 @@ pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
             let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
             return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
         }
+        // Delete confirmation prompt
+        if app.is_confirm_delete() {
+            let title = app
+                .day
+                .tasks
+                .get(app.selected_index())
+                .map(|t| t.title.as_str())
+                .unwrap_or("");
+            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+            return vec![format!("Delete?{}  (Enter=Delete Esc=Cancel)", suffix)];
+        }
         // Command palette prompt (+ show target task title)
         if app.is_command_mode() {
             let title =
@@ -264,7 +275,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | b: bring | [: up | ]: down | e: edit | j/k";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | x: delete | b: bring | [: up | ]: down | e: edit | j/k";
     format!("{} | {}", nav, task)
 }
 
@@ -289,6 +300,7 @@ pub fn help_items_for(app: &App) -> Vec<&'static str> {
             "Shift+Enter/f: finish",
             "i: interrupt",
             "p: postpone",
+            "x: delete",
             "[: up",
             "]: down",
             "e: edit",
