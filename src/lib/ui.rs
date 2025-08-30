@@ -31,10 +31,33 @@ pub fn draw(f: &mut Frame, app: &App) {
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
 
-    // Main content: use textual lines for all modes (stepper/command/show list)
-    let lines = format_task_lines(app).join("\n");
-    let para = Paragraph::new(lines);
-    f.render_widget(para, chunks[1]);
+    // Main content: if in stepper, render a styled line with highlighted minutes
+    if app.is_estimate_editing() {
+        let est = app.selected_estimate().unwrap_or(0);
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let mut line = Line::default();
+        line.spans.push(Span::raw("Estimate: "));
+        line.spans.push(Span::styled(
+            format!("{}m", est),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        ));
+        if !title.is_empty() {
+            line.spans.push(Span::raw(" — "));
+            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
+        }
+        line.spans.push(Span::raw("  (+/-5m or j/k, Enter=OK Esc=Cancel)"));
+        let para = Paragraph::new(line);
+        f.render_widget(para, chunks[1]);
+    } else {
+        let lines = format_task_lines(app).join("\n");
+        let para = Paragraph::new(lines);
+        f.render_widget(para, chunks[1]);
+    }
 
     // Help line at the bottom
     if chunks.len() >= 3 && chunks[2].height > 0 {

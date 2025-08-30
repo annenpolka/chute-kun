@@ -18,6 +18,16 @@ fn estimate_stepper_opens_updates_and_confirms() {
     let lines = ui::format_task_lines(&app);
     assert!(lines.first().unwrap().contains("25m"), "expected 25m after Up, got: {:?}", lines);
 
+    // 'j' decreases by 5m
+    app.handle_key(KeyCode::Char('j'));
+    let lines = ui::format_task_lines(&app);
+    assert!(lines.first().unwrap().contains("20m"));
+
+    // 'k' increases by 5m
+    app.handle_key(KeyCode::Char('k'));
+    let lines = ui::format_task_lines(&app);
+    assert!(lines.first().unwrap().contains("25m"));
+
     // Down decreases by 5m
     app.handle_key(KeyCode::Down);
     let lines = ui::format_task_lines(&app);

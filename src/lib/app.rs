@@ -130,6 +130,12 @@ impl App {
                     KeyCode::Down => {
                         self.day.adjust_estimate(self.selected, -5);
                     }
+                    KeyCode::Char('k') => {
+                        self.day.adjust_estimate(self.selected, 5);
+                    }
+                    KeyCode::Char('j') => {
+                        self.day.adjust_estimate(self.selected, -5);
+                    }
                     _ => {}
                 },
             }
