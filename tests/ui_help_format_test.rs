@@ -14,6 +14,7 @@ fn help_line_includes_primary_keys() {
     // task operations
     assert!(s.contains("i: interrupt"));
     assert!(s.contains("p: postpone"));
+    assert!(s.contains("b: bring"));
     assert!(s.contains("[: up"));
     assert!(s.contains("]: down"));
     assert!(s.contains("e: edit"));

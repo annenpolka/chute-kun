@@ -8,6 +8,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 fn f_key_finishes_active_by_default() {
     // Use default config directly to avoid picking host config files
     let mut app = App::with_config(Config::default());
+    std::env::set_var("CHUTE_KUN_TODAY", "2025-08-30");
     app.add_task("A", 30);
 
     // Start with Enter
@@ -20,7 +21,7 @@ fn f_key_finishes_active_by_default() {
     app.handle_key_event(ev);
 
     assert_eq!(app.day.active_index(), None);
-    assert_eq!(app.day.tasks.len(), 0);
-    assert_eq!(app.history_tasks().len(), 1);
-    assert_eq!(app.history_tasks()[0].state, TaskState::Done);
+    assert_eq!(app.day.tasks.len(), 1);
+    assert!(matches!(app.day.tasks[0].state, TaskState::Done));
+    assert!(app.day.tasks[0].done_ymd.is_some());
 }

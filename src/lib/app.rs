@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::date::today_ymd;
 use crate::task::{DayPlan, Task};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -36,9 +37,9 @@ pub struct App {
     tomorrow: Vec<Task>,
     history: Vec<Task>,
     view: View,
-    active_accum_sec: u16,
     input: Option<Input>,
     pub config: Config,
+    last_seen_ymd: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +60,7 @@ impl App {
     pub fn new() -> Self { Self::with_config(Config::load()) }
 
     pub fn with_config(config: Config) -> Self {
+        let ymd = today_ymd();
         Self {
             title: "Chute_kun".to_string(),
             should_quit: false,
@@ -67,9 +69,9 @@ impl App {
             tomorrow: vec![],
             history: vec![],
             view: View::default(),
-            active_accum_sec: 0,
             input: None,
             config,
+            last_seen_ymd: ymd,
         }
     }
 
@@ -206,6 +208,9 @@ impl App {
             KeyCode::Char('p') => {
                 self.postpone_selected();
             }
+            KeyCode::Char('b') => {
+                self.bring_selected_from_future();
+            }
             KeyCode::Tab => {
                 self.set_view(self.view.next());
             }
@@ -235,22 +240,31 @@ impl App {
         self.handle_key(ev.code);
     }
 
+    /// Handle pasted text from the terminal (bracketed/kitty paste etc.).
+    /// Appends to the input buffer only when in input mode.
+    pub fn handle_paste(&mut self, s: &str) {
+        if let Some(input) = self.input.as_mut() {
+            input.buffer.push_str(s);
+        }
+    }
+
     pub fn add_task(&mut self, title: &str, estimate_min: u16) -> usize {
         self.day.add_task(Task::new(title, estimate_min))
     }
 
     pub fn finish_active(&mut self) {
-        // mark done
-        let _before_len = self.day.tasks.len();
-        self.day.finish_active();
-        // move done (former active) to history if exists
-        if let Some(pos) = (0..self.day.tasks.len())
-            .find(|&i| matches!(self.day.tasks[i].state, crate::task::TaskState::Done))
-        {
-            if let Some(task) = self.day.remove(pos) {
-                self.history.push(task);
-            }
+        if let Some(idx) = self.day.active_index() {
+            let ymd = self.last_seen_ymd;
+            self.day.finish_at(idx, ymd);
         }
+    }
+
+    /// Finish the currently selected task regardless of its active state.
+    pub fn finish_selected(&mut self) {
+        if self.day.tasks.is_empty() { return; }
+        let idx = self.selected.min(self.day.tasks.len() - 1);
+        let ymd = self.last_seen_ymd;
+        self.day.finish_at(idx, ymd);
     }
 
     fn apply_action(&mut self, action: crate::config::Action) {
@@ -289,7 +303,8 @@ impl App {
                 }
             }
             A::FinishActive => {
-                self.finish_active();
+                // Now defined as "finish selected"
+                self.finish_selected();
             }
             A::Pause => {
                 self.day.pause_active();
@@ -310,6 +325,9 @@ impl App {
             }
             A::Postpone => {
                 self.postpone_selected();
+            }
+            A::BringToToday => {
+                self.bring_selected_from_future();
             }
             A::ViewNext => {
                 self.set_view(self.view.next());
@@ -357,6 +375,24 @@ impl App {
         }
     }
 
+    /// Bring a task from Future to Today (mirror of postpone). No-op unless in Future view.
+    pub fn bring_selected_from_future(&mut self) {
+        if self.view != View::Future || self.tomorrow.is_empty() {
+            return;
+        }
+        let idx = self.selected.min(self.tomorrow.len() - 1);
+        let task = self.tomorrow.remove(idx);
+        // Ensure it becomes Planned in Today and append to the end.
+        let t = Task { state: crate::task::TaskState::Planned, ..task };
+        self.day.add_task(t);
+        // Adjust selection within Future list
+        if !self.tomorrow.is_empty() {
+            self.selected = self.selected.min(self.tomorrow.len() - 1);
+        } else {
+            self.selected = 0;
+        }
+    }
+
     pub fn tomorrow_tasks(&self) -> &Vec<Task> {
         &self.tomorrow
     }
@@ -368,9 +404,6 @@ impl App {
         self.view
     }
 
-    pub fn active_carry_seconds(&self) -> u16 {
-        self.active_accum_sec
-    }
 
     // Input mode helpers for UI/tests
     pub fn in_input_mode(&self) -> bool {
@@ -409,11 +442,17 @@ impl App {
     }
 
     pub fn tick(&mut self, seconds: u16) {
+        // Sweep when the local date changes
+        let today = today_ymd();
+        if today != self.last_seen_ymd {
+            self.last_seen_ymd = today;
+            self.sweep_done_before(today);
+        }
         if let Some(active) = self.day.active_index() {
-            self.active_accum_sec = self.active_accum_sec.saturating_add(seconds);
-            while self.active_accum_sec >= 60 {
-                self.active_accum_sec -= 60;
-                if let Some(t) = self.day.tasks.get_mut(active) {
+            if let Some(t) = self.day.tasks.get_mut(active) {
+                t.actual_carry_sec = t.actual_carry_sec.saturating_add(seconds);
+                while t.actual_carry_sec >= 60 {
+                    t.actual_carry_sec -= 60;
                     t.actual_min = t.actual_min.saturating_add(1);
                 }
             }
@@ -429,8 +468,37 @@ impl App {
         self.tomorrow = future;
         self.history = past;
         self.selected = 0;
-        self.active_accum_sec = 0;
         self.set_view(View::Today);
+        // Ensure old done items are moved to Past on startup
+        self.sweep_done_before(self.last_seen_ymd);
+    }
+
+}
+
+impl App {
+    /// Move any Today tasks with `done_ymd` strictly before `ymd` to history.
+    pub fn sweep_done_before(&mut self, ymd: u32) {
+        let mut i = 0;
+        while i < self.day.tasks.len() {
+            let move_to_past = match self.day.tasks[i].done_ymd {
+                Some(d) if d < ymd => true,
+                _ => false,
+            };
+            if move_to_past {
+                if let Some(task) = self.day.remove(i) {
+                    self.history.push(task);
+                }
+                // don't increment i; elements shifted left
+                continue;
+            }
+            i += 1;
+        }
+        // Clamp selection
+        if !self.day.tasks.is_empty() {
+            self.selected = self.selected.min(self.day.tasks.len() - 1);
+        } else {
+            self.selected = 0;
+        }
     }
 
     fn apply_command(&mut self, cmd: &str) {

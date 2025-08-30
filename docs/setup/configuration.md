@@ -28,6 +28,7 @@ reorder_up = "["
 reorder_down = "]"
 estimate_plus = "e"
 postpone = "p"
+bring_to_today = "b"
 view_next = "Tab"
 view_prev = "BackTab"
 select_up = ["Up", "k"]

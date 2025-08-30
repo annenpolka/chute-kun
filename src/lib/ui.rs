@@ -1,8 +1,9 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Tabs},
+    widgets::{Block, Borders, Paragraph, Tabs, Wrap},
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, View};
 use crate::clock::Clock;
@@ -15,11 +16,19 @@ pub fn draw(f: &mut Frame, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Split inner area: tabs on top, task list, help line at bottom (if space).
+    // Pre-compute wrapped help lines for current width, to size the layout.
+    let help_lines = help_lines_for_width(app, inner.width.max(1));
+    let help_height = help_lines.len() as u16; // 1+ lines depending on width
+
+    // Split inner area: tabs on top, task list, help block at bottom (if space).
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(0),
+            Constraint::Length(help_height.max(1)),
+        ])
         .split(inner);
 
     // Tabs for date views
@@ -59,10 +68,12 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(para, chunks[1]);
     }
 
-    // Help line at the bottom
+    // Help block at the bottom (wrapped to fit width)
     if chunks.len() >= 3 && chunks[2].height > 0 {
-        let help =
-            Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
+        let help_text = help_lines.join("\n");
+        let help = Paragraph::new(help_text)
+            .style(Style::default().fg(Color::DarkGray))
+            .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
     }
 }
@@ -76,10 +87,16 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Keep layout consistent with `draw`: tabs, content, help line
+    // Keep layout consistent with `draw`: tabs, content, help block
+    let help_lines = help_lines_for_width(app, inner.width.max(1));
+    let help_height = help_lines.len() as u16;
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(0),
+            Constraint::Length(help_height.max(1)),
+        ])
         .split(inner);
 
     let (titles, selected) = tab_titles(app);
@@ -90,16 +107,31 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
 
-    let lines = format_task_lines_at(now, app).join("\n");
-    let para = Paragraph::new(lines);
+    // Content with injected clock, using styled lines for selection highlight
+    let mut styled: Vec<Line> =
+        format_task_lines_at(now, app).into_iter().map(Line::from).collect();
+    let cur_len = match app.view() {
+        View::Past => app.history_tasks().len(),
+        View::Today => app.day.tasks.len(),
+        View::Future => app.tomorrow_tasks().len(),
+    };
+    if cur_len > 0 {
+        let idx = app.selected_index().min(styled.len().saturating_sub(1));
+        if let Some(line) = styled.get_mut(idx) {
+            line.style = Style::default().bg(Color::Blue);
+        }
+    }
+    let para = Paragraph::new(styled);
     if chunks.len() >= 2 && chunks[1].height > 0 {
         f.render_widget(para, chunks[1]);
     }
 
-    // Help line at the bottom
+    // Help block at the bottom (wrapped to fit width)
     if chunks.len() >= 3 && chunks[2].height > 0 {
-        let help =
-            Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
+        let help_text = help_lines.join("\n");
+        let help = Paragraph::new(help_text)
+            .style(Style::default().fg(Color::DarkGray))
+            .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
     }
 }
@@ -167,7 +199,7 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
     if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
-    let active_idx = app.day.active_index();
+    // active index not needed for seconds rendering anymore (per-task seconds)
 
     // Build schedule start times from `now_min`, adding remaining durations of preceding tasks.
     let mut cursor = now_min;
@@ -190,7 +222,10 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
         .enumerate()
         .map(|(i, t)| {
             let sel = if i == app.selected_index() { "▶" } else { " " };
-            let secs = if active_idx == Some(i) { app.active_carry_seconds() } else { 0 };
+            let secs = match t.state {
+                TaskState::Active | TaskState::Paused => t.actual_carry_sec,
+                _ => 0,
+            };
             let hh = (starts[i] / 60) % 24;
             let mm = starts[i] % 60;
             format!(
@@ -225,8 +260,13 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
 
     let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
     let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
-    let carry_sec: u32 =
-        if app.day.active_index().is_some() { app.active_carry_seconds() as u32 } else { 0 };
+    // 正攻法: 全タスクの部分秒を合算
+    let carry_sec: u32 = app
+        .day
+        .tasks
+        .iter()
+        .map(|t| t.actual_carry_sec as u32)
+        .sum();
 
     let total_act_sec = total_act_min * 60 + carry_sec;
     let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
@@ -248,7 +288,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | [: up | ]: down | e: edit (j/k)";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | b: bring | [: up | ]: down | e: +5m";
     format!("{} | {}", nav, task)
 }
 
@@ -258,8 +298,61 @@ pub fn format_help_line() -> String {
 pub fn format_help_line_for(app: &App) -> String {
     match app.view() {
         View::Today => format_help_line(),
-        View::Past | View::Future => "q: quit | Tab: switch view".to_string(),
+        View::Past => "q: quit | Tab: switch view".to_string(),
+        View::Future => "q: quit | Tab: switch view | b: bring".to_string(),
     }
+}
+
+/// Build help items depending on the current view. Used for wrapping.
+pub fn help_items_for(app: &App) -> Vec<&'static str> {
+    let mut items: Vec<&'static str> = vec!["q: quit", "Tab: switch view"];
+    if matches!(app.view(), View::Today) {
+        items.extend([
+            "Enter: start/resume",
+            "Space: pause",
+            "Shift+Enter/f: finish",
+            "i: interrupt",
+            "p: postpone",
+            "[: up",
+            "]: down",
+            "e: +5m",
+        ]);
+    }
+    items
+}
+
+/// Wrap help items into lines that fit within `width` cells, inserting ` | ` between items.
+/// This uses Unicode width to count display cells.
+pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
+    let width = width as usize;
+    if width == 0 { return vec![String::new()]; }
+    let mut lines: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let sep = " | ";
+    for item in items {
+        if cur.is_empty() {
+            cur.push_str(item);
+            continue;
+        }
+        let candidate = format!("{}{}{}", cur, sep, item);
+        if UnicodeWidthStr::width(candidate.as_str()) <= width {
+            cur = candidate;
+        } else {
+            // commit current line and start a new one
+            lines.push(cur);
+            cur = (*item).to_string();
+        }
+    }
+    if !cur.is_empty() {
+        lines.push(cur);
+    }
+    lines
+}
+
+/// Convenience: get wrapped help lines for current app state and width.
+pub fn help_lines_for_width(app: &App, width: u16) -> Vec<String> {
+    let items = help_items_for(app);
+    wrap_help_items_to_width(&items, width)
 }
 
 fn app_display_base(app: &App) -> u16 { app.config.day_start_minutes }
