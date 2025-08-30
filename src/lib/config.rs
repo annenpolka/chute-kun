@@ -268,9 +268,54 @@ impl Config {
         }
         Config::default()
     }
+
+    /// Render a default TOML string users can customize.
+    pub fn default_toml() -> String {
+        // Keep keys aligned with KeyMap::default()
+        r#"# Chute_kun configuration
+# 設定ファイルの場所: $XDG_CONFIG_HOME/chute_kun/config.toml （なければ ~/.config/chute_kun/config.toml）
+
+# 1日の開始時刻（固定表示）。"HH:MM" 形式。既定は 09:00。
+day_start = "09:00"
+
+[keys]
+# 既定のキーバインド。必要なものだけ上書きできます。
+quit = "q"
+add_task = "i"
+add_interrupt = "I"
+start_or_resume = "Enter"
+finish_active = "Shift+Enter"
+pause = "Space"
+reorder_up = "["
+reorder_down = "]"
+estimate_plus = "e"
+postpone = "p"
+view_next = "Tab"
+view_prev = "BackTab"
+select_up = ["Up", "k"]
+select_down = ["Down", "j"]
+"#.to_string()
+    }
+
+    /// Write a default config file to the resolved path.
+    /// - If `CHUTE_KUN_CONFIG` is set, writes there; otherwise XDG default.
+    /// - Creates parent directories when必要.
+    /// - If file already exists, leaves it as-is and returns Ok(path).
+    pub fn write_default_file() -> Result<std::path::PathBuf> {
+        let path = if let Ok(p) = std::env::var("CHUTE_KUN_CONFIG") {
+            std::path::PathBuf::from(p)
+        } else {
+            default_config_path().ok_or_else(|| anyhow!("could not resolve config path"))?
+        };
+        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent).ok(); }
+        if !path.exists() {
+            std::fs::write(&path, Self::default_toml()).context("write default config")?;
+        }
+        Ok(path)
+    }
 }
 
-fn default_config_path() -> Option<PathBuf> {
+pub fn default_config_path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| dirs::config_dir());

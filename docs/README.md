@@ -7,6 +7,7 @@
 - 方法論: `TaskChute_methodology.md`
 - 再調査（2025-08）: `research/taskchute-research-2025-08.md`
 - Rust TUI 技術調査（2025-08）: `research/2025-08-rust-tui-landscape.md`
+ - 設定: `setup/configuration.md`
 
 ## Feature Specs
 - TUI 仕様（初版）: `features/tui-app-spec-v1.md`

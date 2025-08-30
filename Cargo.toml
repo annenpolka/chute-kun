@@ -23,6 +23,9 @@ dirs = "5"
 ratatui = "0.26"
 crossterm = "0.27"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
 
 [[bin]]
 name = "chute_kun"
