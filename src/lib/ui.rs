@@ -509,18 +509,16 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         let mm = starts[i] % 60;
         let planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
         let actual_cell = Cell::from(format_actual_last_finish_time(t));
-        let title_cell = Cell::from(format!(
-            "{} {} (est:{}m act:{}m {}s)",
-            state_icon(t.state),
-            t.title,
-            t.estimate_min,
-            t.actual_min,
-            if matches!(t.state, TaskState::Active | TaskState::Paused) {
-                t.actual_carry_sec
-            } else {
-                0
-            }
-        ));
+        // Title: drop seconds (moved to dedicated Act column) but keep estimate
+        let title_cell =
+            Cell::from(format!("{} {} (est:{}m)", state_icon(t.state), t.title, t.estimate_min,));
+        // New dedicated accumulated time column with seconds
+        let secs = if matches!(t.state, TaskState::Active | TaskState::Paused) {
+            t.actual_carry_sec
+        } else {
+            0
+        };
+        let act_cell = Cell::from(format!("{}m {}s", t.actual_min, secs));
         let highlight_bg = if i == selected {
             Some(SELECTED_ROW_BG)
         } else if hovered == Some(i) {
@@ -528,7 +526,9 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         } else {
             None
         };
-        let mut row = Row::new(vec![planned_cell, actual_cell, title_cell]);
+        // Column order: Plan | Task | Actual (measured time as last-finish placeholder)
+        // Column order: Plan | Task | Act | Actual
+        let mut row = Row::new(vec![planned_cell, title_cell, act_cell, actual_cell]);
         if let Some(bg) = highlight_bg {
             let s = Style::default().bg(bg);
             row = row.style(s);
@@ -537,11 +537,18 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
     }
 
     // Header
-    let header = Row::new(vec![Cell::from("Plan"), Cell::from("Actual"), Cell::from("Task")])
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    // Header labels follow the same order: Plan | Task | Act | Actual
+    let header = Row::new(vec![
+        Cell::from("Plan"),
+        Cell::from("Task"),
+        Cell::from("Act"),
+        Cell::from("Actual"),
+    ])
+    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
 
-    // Column widths: planned is fixed 5, actual takes up to 22, title consumes the rest
-    let widths = [Constraint::Length(5), Constraint::Length(30), Constraint::Min(10)];
+    // Column widths: Plan fixed 5, Task grows, Act fits e.g. "120m 59s" (9), Actual label width (6)
+    let widths =
+        [Constraint::Length(5), Constraint::Min(10), Constraint::Length(9), Constraint::Length(6)];
 
     // Render table using a minimal block to avoid nested borders (outer block already drawn)
     Table::new(rows, widths).header(header).column_spacing(1).block(Block::default())
