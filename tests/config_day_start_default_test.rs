@@ -11,4 +11,3 @@ fn default_display_uses_fixed_9am_base() {
     assert!(lines[0].starts_with("09:00 "), "expected 09:00 start, got: {}", lines[0]);
     assert!(lines[1].starts_with("09:30 "), "expected 09:30 second, got: {}", lines[1]);
 }
-

@@ -1,6 +1,6 @@
-use crate::app::{App, View};
+use crate::app::App;
 use crate::config::Config;
-use crate::task::{DayPlan, Task};
+use crate::task::Task;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;

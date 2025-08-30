@@ -17,4 +17,3 @@ fn init_config_writes_default_toml_to_env_path() {
     let s = fs::read_to_string(&path).expect("config file created");
     assert!(s.contains("day_start = \"09:00\""), "default day_start missing: {}", s);
 }
-

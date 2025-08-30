@@ -29,6 +29,7 @@ impl Task {
             actual_min: 0,
             actual_carry_sec: 0,
             state: TaskState::Planned,
+            done_ymd: None,
         }
     }
 }
@@ -83,7 +84,9 @@ impl DayPlan {
     /// Mark the task at `index` as Done with the given date (YYYYMMDD).
     /// - If it was the active task, clear active.
     pub fn finish_at(&mut self, index: usize, today_ymd: u32) {
-        if index >= self.tasks.len() { return; }
+        if index >= self.tasks.len() {
+            return;
+        }
         if self.active == Some(index) {
             self.active = None;
             if let Some(t) = self.tasks.get_mut(index) {

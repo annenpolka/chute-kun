@@ -19,4 +19,3 @@ fn future_help_includes_bring_only() {
     assert!(!s.contains("start/pause"));
     assert!(!s.contains("p: postpone"));
 }
-

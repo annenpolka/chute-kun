@@ -28,4 +28,3 @@ fn bring_moves_selected_from_future_to_today_and_updates_selection() {
     // 選択は Future 側でクランプされる（空なら 0）
     assert_eq!(app.selected_index(), 0);
 }
-
