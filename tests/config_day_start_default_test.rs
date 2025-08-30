@@ -3,6 +3,8 @@ use chute_kun::{app::App, ui};
 // Default display should start from a fixed 09:00 base, not system now.
 #[test]
 fn default_display_uses_fixed_9am_base() {
+    // Ensure external config is ignored for this test
+    std::env::set_var("CHUTE_KUN_DISABLE_CONFIG", "1");
     let mut app = App::new();
     app.add_task("A", 30);
     app.add_task("B", 20);

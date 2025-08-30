@@ -10,7 +10,9 @@ fn i_enters_input_and_enter_adds_typed_title() {
     // Type a title: "Hi"
     app.handle_key(KeyCode::Char('H'));
     app.handle_key(KeyCode::Char('i'));
-    // Commit
+    // First Enter opens estimate input; second Enter accepts default 25m
+    app.handle_key(KeyCode::Enter);
+    assert!(app.in_input_mode());
     app.handle_key(KeyCode::Enter);
 
     assert_eq!(app.day.tasks.len(), 1);
@@ -28,6 +30,8 @@ fn i_enters_interrupt_input_and_uses_interrupt_defaults() {
     app.handle_key(KeyCode::Char('e'));
     app.handle_key(KeyCode::Char('n'));
     app.handle_key(KeyCode::Char('t'));
+    // Enter x2 to accept defaults for estimate
+    app.handle_key(KeyCode::Enter);
     app.handle_key(KeyCode::Enter);
 
     assert_eq!(app.day.tasks.len(), 1);
@@ -41,6 +45,7 @@ fn esc_cancels_input_without_adding() {
     let mut app = App::new();
     app.handle_key(KeyCode::Char('i'));
     app.handle_key(KeyCode::Char('A'));
+    // Esc cancels creation at title step
     app.handle_key(KeyCode::Esc);
     assert_eq!(app.day.tasks.len(), 0);
 }
@@ -52,6 +57,8 @@ fn backspace_edits_buffer_before_commit() {
     app.handle_key(KeyCode::Char('A'));
     app.handle_key(KeyCode::Char('b'));
     app.handle_key(KeyCode::Backspace);
+    // Accept via Enter twice (title then estimate)
+    app.handle_key(KeyCode::Enter);
     app.handle_key(KeyCode::Enter);
 
     assert_eq!(app.day.tasks.len(), 1);

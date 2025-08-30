@@ -60,7 +60,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         content_idx = 2;
     }
 
-    // Main content: if in stepper, render a styled line with highlighted minutes
+    // Main content: if in estimate edit, render a styled line with highlighted minutes
     if app.is_estimate_editing() {
         let est = app.selected_estimate().unwrap_or(0);
         let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
@@ -74,7 +74,31 @@ pub fn draw(f: &mut Frame, app: &App) {
             line.spans.push(Span::raw(" — "));
             line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
         }
-        line.spans.push(Span::raw("  (+/-5m or j/k, Enter=OK Esc=Cancel)"));
+        line.spans.push(Span::raw(
+            "  (←/→ or j/k to adjust; click slider; Enter=OK Esc=Cancel)",
+        ));
+        let para = Paragraph::new(line);
+        f.render_widget(para, chunks[content_idx]);
+    } else if app.is_new_task_estimate() {
+        // Show a single-line prompt for slider-based estimate input
+        let mut line = Line::default();
+        let est = app
+            .input_buffer()
+            .and_then(|s| s.parse::<u16>().ok())
+            .or_else(|| app.new_task_default_estimate())
+            .unwrap_or(25);
+        line.spans.push(Span::raw("Estimate: "));
+        line.spans.push(Span::styled(
+            format!("{}m", est),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        ));
+        if let Some(title) = app.new_task_title() {
+            line.spans.push(Span::raw(" — "));
+            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
+        }
+        line.spans.push(Span::raw(
+            "  (←/→ or j/k to adjust; click/drag slider; Enter=OK Esc=Cancel)",
+        ));
         let para = Paragraph::new(line);
         f.render_widget(para, chunks[content_idx]);
     } else if app.in_input_mode() {
@@ -110,7 +134,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(help, chunks[help_idx]);
     }
 
-    // Overlay: centered estimate editor popup (styled buttons)
+    // Overlay: centered estimate editor popup (slider + OK/Cancel)
     if let Some(popup) = compute_estimate_popup_rect(app, area) {
         let border = Style::default().fg(Color::Yellow);
         let title_line =
@@ -128,34 +152,13 @@ pub fn draw(f: &mut Frame, app: &App) {
             Paragraph::new(Span::styled(msg, Style::default().fg(Color::Yellow))),
             msg_rect,
         );
-        let (minus, plus, ok, cancel) = estimate_popup_button_hitboxes(app, popup);
-        let btn_y = minus.y;
+        let (track, ok, cancel) = estimate_slider_hitboxes(app, popup);
+        render_slider_line(f, track, app.selected_estimate().unwrap_or(0));
+        let btn_y = ok.y;
         let mut spans: Vec<Span> = Vec::new();
-        let pad = (minus.x.saturating_sub(inner.x)) as usize;
+        let pad = (ok.x.saturating_sub(inner.x)) as usize;
         if pad > 0 {
             spans.push(Span::raw(" ".repeat(pad)));
-        }
-        let minus_style =
-            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstMinus)) {
-                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
-            };
-        spans.push(Span::styled("-5m".to_string(), minus_style));
-        let gap1 = plus.x.saturating_sub(minus.x + minus.width) as usize;
-        if gap1 > 0 {
-            spans.push(Span::raw(" ".repeat(gap1)));
-        }
-        let plus_style =
-            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstPlus)) {
-                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
-            };
-        spans.push(Span::styled("+5m".to_string(), plus_style));
-        let gap2 = ok.x.saturating_sub(plus.x + plus.width) as usize;
-        if gap2 > 0 {
-            spans.push(Span::raw(" ".repeat(gap2)));
         }
         let ok_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstOk)) {
             Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
@@ -163,9 +166,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             Style::default().fg(Color::Black).bg(Color::Blue).add_modifier(Modifier::BOLD)
         };
         spans.push(Span::styled("OK".to_string(), ok_style));
-        let gap3 = cancel.x.saturating_sub(ok.x + ok.width) as usize;
-        if gap3 > 0 {
-            spans.push(Span::raw(" ".repeat(gap3)));
+        let gap2 = cancel.x.saturating_sub(ok.x + ok.width) as usize;
+        if gap2 > 0 {
+            spans.push(Span::raw(" ".repeat(gap2)));
         }
         let cancel_style =
             if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstCancel)) {
@@ -194,6 +197,63 @@ pub fn draw(f: &mut Frame, app: &App) {
             Paragraph::new(Span::styled(msg, Style::default().fg(Color::Cyan))),
             msg_rect,
         );
+        let (add, cancel) = input_popup_button_hitboxes(app, popup);
+        let btn_y = add.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad = (add.x.saturating_sub(inner.x)) as usize;
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        let add_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::InputAdd)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Green).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("OK".to_string(), add_style));
+        let gap = cancel.x.saturating_sub(add.x + add.width) as usize;
+        if gap > 0 {
+            spans.push(Span::raw(" ".repeat(gap)));
+        }
+        let cancel_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::InputCancel)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Cancel".to_string(), cancel_style));
+        let btn_rect = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
+    }
+
+    // Overlay: new-task estimate slider input popup
+    if let Some(popup) = compute_new_task_estimate_popup_rect(app, area) {
+        let border = Style::default().fg(Color::Green);
+        let title_line =
+            Line::from(Span::styled(" Estimate ", border.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner = block.inner(popup);
+        let cur_est: u16 = app
+            .input_buffer()
+            .and_then(|s| s.parse::<u16>().ok())
+            .or_else(|| app.new_task_default_estimate())
+            .unwrap_or(25);
+        let title = app.new_task_title().unwrap_or("");
+        let msg = if title.is_empty() {
+            format!("Estimate: {}m", cur_est)
+        } else {
+            format!("Estimate: {}m — {}", cur_est, title)
+        };
+        let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+        f.render_widget(
+            Paragraph::new(Span::styled(msg, Style::default().fg(Color::Green))),
+            msg_rect,
+        );
+        // Slider track
+        let (track, _ok, _cancel) = estimate_slider_hitboxes(app, popup);
+        render_slider_line(f, track, cur_est);
         let (add, cancel) = input_popup_button_hitboxes(app, popup);
         let btn_y = add.y;
         let mut spans: Vec<Span> = Vec::new();
@@ -396,10 +456,16 @@ pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
         let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
         return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
     }
+    if app.is_new_task_estimate() {
+        let buf = app.input_buffer().unwrap_or("");
+        let title = app.new_task_title().unwrap_or("");
+        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+        return vec![format!("Estimate (min): {} _{}  (Enter=OK Esc=Cancel)", buf, suffix)];
+    }
     // Input mode (Normal/Interrupt) prompt only when not in delete confirm
     if app.in_input_mode() && !app.is_confirm_delete() {
         let buf = app.input_buffer().unwrap_or("");
-        return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
+        return vec![format!("Input: {} _  (Enter=OK Esc=Cancel)", buf)];
     }
     match app.view() {
         View::Past => render_list_slice(now_min, app, app.history_tasks()),
@@ -830,32 +896,43 @@ pub fn compute_estimate_popup_rect(app: &App, area: Rect) -> Option<Rect> {
     let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
     let msg = format!("Estimate: {}m — {}", app.selected_estimate().unwrap_or(0), title);
     let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
-    let popup_w = content_w.saturating_add(4).min(inner.width).max(30).min(inner.width);
-    let popup_h: u16 = 4; // message + buttons line
+    let popup_w = content_w.saturating_add(4).min(inner.width).max(34).min(inner.width);
+    let popup_h: u16 = 5; // message + slider + buttons line
     let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
     let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
     Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
 }
 
-pub fn estimate_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect, Rect) {
-    let inner = Rect {
-        x: popup.x + 1,
-        y: popup.y + 1,
-        width: popup.width.saturating_sub(2),
-        height: popup.height.saturating_sub(2),
-    };
-    let y = inner.y + 1;
-    let m_w = UnicodeWidthStr::width("-5m") as u16;
-    let p_w = UnicodeWidthStr::width("+5m") as u16;
+// Slider hitboxes for estimate editor
+pub fn estimate_slider_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
+    let inner = Rect { x: popup.x + 1, y: popup.y + 1, width: popup.width.saturating_sub(2), height: popup.height.saturating_sub(2) };
+    let track_y = inner.y + 1;
+    let track = Rect { x: inner.x + 2, y: track_y, width: inner.width.saturating_sub(4), height: 1 };
     let ok_w = UnicodeWidthStr::width("OK") as u16;
     let ca_w = UnicodeWidthStr::width("Cancel") as u16;
-    let total = m_w + 2 + p_w + 2 + ok_w + 2 + ca_w;
+    let total = ok_w + 2 + ca_w;
     let start_x = inner.x + (inner.width.saturating_sub(total)) / 2;
-    let minus = Rect { x: start_x, y, width: m_w, height: 1 };
-    let plus = Rect { x: start_x + m_w + 2, y, width: p_w, height: 1 };
-    let ok = Rect { x: plus.x + p_w + 2, y, width: ok_w, height: 1 };
-    let cancel = Rect { x: ok.x + ok_w + 2, y, width: ca_w, height: 1 };
-    (minus, plus, ok, cancel)
+    let ok = Rect { x: start_x, y: track_y + 1, width: ok_w, height: 1 };
+    let cancel = Rect { x: start_x + ok_w + 2, y: track_y + 1, width: ca_w, height: 1 };
+    (track, ok, cancel)
+}
+
+pub fn slider_x_for_minutes(track: Rect, min: u16, max: u16, step: u16, minutes: u16) -> u16 {
+    let minutes = minutes.clamp(min, max);
+    let steps = ((max - min) / step).max(1);
+    let pos = ((minutes - min) / step).min(steps);
+    let w = track.width.max(1) as u32;
+    let x = track.x as u32 + (pos as u32 * (w - 1)) / (steps as u32);
+    x as u16
+}
+
+pub fn minutes_from_slider_x(track: Rect, min: u16, max: u16, step: u16, x: u16) -> u16 {
+    let w = track.width.max(1);
+    let x = x.clamp(track.x, track.x + w.saturating_sub(1));
+    let rel = (x - track.x) as u32;
+    let steps = ((max - min) / step).max(1) as u32;
+    let pos = (rel * steps + (w as u32 - 1) / 2) / (w as u32 - 1).max(1);
+    (min + (pos as u16) * step).clamp(min, max)
 }
 
 // Input popup (Normal/Interrupt)
@@ -876,6 +953,29 @@ pub fn compute_input_popup_rect(app: &App, area: Rect) -> Option<Rect> {
     Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
 }
 
+// New-task estimate popup (slider)
+pub fn compute_new_task_estimate_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_new_task_estimate() {
+        return None;
+    }
+    let block =
+        Block::default().title(header_title_line(app_display_base(app), app)).borders(Borders::ALL);
+    let inner = block.inner(area);
+    let est = app
+        .input_buffer()
+        .and_then(|s| s.parse::<u16>().ok())
+        .or_else(|| app.new_task_default_estimate())
+        .unwrap_or(25);
+    let title = app.new_task_title().unwrap_or("");
+    let msg = if title.is_empty() { format!("Estimate: {}m", est) } else { format!("Estimate: {}m — {}", est, title) };
+    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let popup_w = content_w.saturating_add(4).min(inner.width).max(34).min(inner.width);
+    let popup_h: u16 = 5;
+    let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+    let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+    Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
 pub fn input_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
     let inner = Rect {
         x: popup.x + 1,
@@ -883,8 +983,9 @@ pub fn input_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
         width: popup.width.saturating_sub(2),
         height: popup.height.saturating_sub(2),
     };
-    let y = inner.y + 1;
-    let add_w = UnicodeWidthStr::width("Add") as u16;
+    // Place buttons on the last inner line, so it adapts to both 4-line and 5-line popups
+    let y = inner.y + inner.height.saturating_sub(1);
+    let add_w = UnicodeWidthStr::width("OK") as u16;
     let ca_w = UnicodeWidthStr::width("Cancel") as u16;
     let total = add_w + 2 + ca_w;
     let start_x = inner.x + (inner.width.saturating_sub(total)) / 2;
@@ -895,6 +996,36 @@ pub fn input_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
 
 // note: helpers that parsed message text for positions were removed in favor of
 // explicit hitbox geometry to reduce dead code and simplify clippy compliance.
+
+fn render_slider_line(f: &mut Frame, track: Rect, minutes: u16) {
+    // Styled slider: [====●····]
+    let min = 0u16;
+    let max = 240u16;
+    let step = 5u16;
+    let knob_x = slider_x_for_minutes(track, min, max, step, minutes);
+    let mut line = Line::default();
+    // Left bracket just before track
+    line.spans.push(Span::styled("[".to_string(), Style::default().fg(Color::DarkGray)));
+    for x in track.x..track.x + track.width {
+        if x == knob_x {
+            line.spans.push(Span::styled("●".to_string(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
+        } else if x < knob_x {
+            line.spans.push(Span::styled("=".to_string(), Style::default().fg(Color::Green)));
+        } else {
+            line.spans.push(Span::styled("·".to_string(), Style::default().fg(Color::DarkGray)));
+        }
+    }
+    line.spans.push(Span::styled("]".to_string(), Style::default().fg(Color::DarkGray)));
+    let para = Paragraph::new(line);
+    // Expand rect by one cell left/right to contain brackets when possible
+    let expanded = Rect {
+        x: track.x.saturating_sub(1),
+        y: track.y,
+        width: track.width.saturating_add(2),
+        height: 1,
+    };
+    f.render_widget(para, expanded);
+}
 
 /// Compute key layout rectangles used by `draw`, for hit testing and tests.
 /// Returns (tabs, optional active banner, list/content, help) within the inner bordered area.

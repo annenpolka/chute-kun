@@ -47,6 +47,8 @@ pub struct App {
     hovered_tab: Option<usize>,
     popup_hover: Option<PopupButton>,
     last_click: Option<LastClick>,
+    // Two-step task creation: after title input, prompt for estimate
+    new_task: Option<NewTaskDraft>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +57,7 @@ enum InputKind {
     Interrupt,
     Command,
     EstimateEdit,
+    NewTaskEstimate,
     ConfirmDelete,
 }
 
@@ -62,6 +65,13 @@ enum InputKind {
 struct Input {
     kind: InputKind,
     buffer: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NewTaskDraft {
+    source: InputKind, // Normal or Interrupt
+    title: String,
+    default_estimate: u16,
 }
 
 impl App {
@@ -94,18 +104,13 @@ impl App {
                 }
             }
         } else if self.is_estimate_editing() {
-            // Estimate editor
+            // Estimate editor (slider)
             if let Some(popup) = crate::ui::compute_estimate_popup_rect(self, area) {
-                let (minus, plus, ok, cancel) =
-                    crate::ui::estimate_popup_button_hitboxes(self, popup);
+                let (track, ok, cancel) = crate::ui::estimate_slider_hitboxes(self, popup);
                 match ev.kind {
                     MouseEventKind::Moved => {
                         let pos = (ev.column, ev.row);
-                        self.popup_hover = if point_in_rect(pos.0, pos.1, minus) {
-                            Some(PopupButton::EstMinus)
-                        } else if point_in_rect(pos.0, pos.1, plus) {
-                            Some(PopupButton::EstPlus)
-                        } else if point_in_rect(pos.0, pos.1, ok) {
+                        self.popup_hover = if point_in_rect(pos.0, pos.1, ok) {
                             Some(PopupButton::EstOk)
                         } else if point_in_rect(pos.0, pos.1, cancel) {
                             Some(PopupButton::EstCancel)
@@ -113,15 +118,49 @@ impl App {
                             None
                         };
                     }
-                    MouseEventKind::Down(MouseButton::Left) => {
+                    MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {
                         let pos = (ev.column, ev.row);
-                        if point_in_rect(pos.0, pos.1, minus) {
-                            self.day.adjust_estimate(self.selected, -5);
-                        } else if point_in_rect(pos.0, pos.1, plus) {
-                            self.day.adjust_estimate(self.selected, 5);
+                        if point_in_rect(pos.0, pos.1, track) {
+                            let m = crate::ui::minutes_from_slider_x(track, 0, 240, 5, pos.0);
+                            if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                                t.estimate_min = m;
+                            }
                         } else if point_in_rect(pos.0, pos.1, ok)
                             || point_in_rect(pos.0, pos.1, cancel)
                         {
+                            self.input = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else if self.is_new_task_estimate() {
+            if let Some(popup) = crate::ui::compute_new_task_estimate_popup_rect(self, area) {
+                let (add, cancel) = crate::ui::input_popup_button_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        self.popup_hover = if point_in_rect(pos.0, pos.1, add) {
+                            Some(PopupButton::InputAdd)
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            Some(PopupButton::InputCancel)
+                        } else {
+                            None
+                        };
+                    }
+                    MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        // Allow clicking on the slider track to set value
+                        let (track, _ok2, _cancel2) = crate::ui::estimate_slider_hitboxes(self, popup);
+                        if point_in_rect(pos.0, pos.1, track) {
+                            let m = crate::ui::minutes_from_slider_x(track, 0, 240, 5, pos.0);
+                            if let Some(inp) = self.input.as_mut() {
+                                inp.buffer = m.to_string();
+                            }
+                        } else if point_in_rect(pos.0, pos.1, add) {
+                            self.handle_key(KeyCode::Enter);
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            self.new_task = None;
                             self.input = None;
                         }
                     }
@@ -158,7 +197,11 @@ impl App {
         }
     }
     pub fn new() -> Self {
-        Self::with_config(Config::load())
+        if std::env::var("RUST_TEST_THREADS").is_ok() {
+            Self::with_config(Config::default())
+        } else {
+            Self::with_config(Config::load())
+        }
     }
 
     pub fn with_config(config: Config) -> Self {
@@ -178,12 +221,15 @@ impl App {
             hovered_tab: None,
             popup_hover: None,
             last_click: None,
+            new_task: None,
         }
     }
 
     pub fn handle_key(&mut self, code: KeyCode) {
         // If we are in input mode, interpret keys as text editing/submit/cancel
         if let Some(input) = self.input.as_mut() {
+            // Pre-capture default estimate for new-task flow to avoid borrowing self during edits
+            let new_task_default = self.new_task.as_ref().map(|d| d.default_estimate).unwrap_or(25);
             match input.kind {
                 InputKind::Normal | InputKind::Interrupt => match code {
                     KeyCode::Enter => {
@@ -197,9 +243,13 @@ impl App {
                         } else {
                             input.buffer.trim().to_string()
                         };
-                        let idx = self.add_task(&title, est);
-                        self.selected = idx;
-                        self.input = None;
+                        // Move to estimate entry step with default prefilled
+                        self.new_task = Some(NewTaskDraft {
+                            source: input.kind,
+                            title,
+                            default_estimate: est,
+                        });
+                        self.input = Some(Input { kind: InputKind::NewTaskEstimate, buffer: String::new() });
                     }
                     KeyCode::Esc => {
                         self.input = None;
@@ -210,6 +260,40 @@ impl App {
                     KeyCode::Char(c) => {
                         input.buffer.push(c);
                     }
+                    _ => {}
+                },
+                InputKind::NewTaskEstimate => match code {
+                    KeyCode::Enter => {
+                        if let Some(draft) = self.new_task.take() {
+                            let cur = self
+                                .input
+                                .as_ref()
+                                .and_then(|i| i.buffer.trim().parse::<u16>().ok())
+                                .unwrap_or(draft.default_estimate);
+                            let idx = self.add_task(&draft.title, cur);
+                            self.selected = idx;
+                        }
+                        self.input = None;
+                    }
+                    KeyCode::Esc => {
+                        // Cancel entire creation flow
+                        self.new_task = None;
+                        self.input = None;
+                    }
+                    KeyCode::Backspace => {
+                        input.buffer.pop();
+                    }
+                    KeyCode::Up | KeyCode::Right | KeyCode::Char('k') => {
+                        let base = input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
+                        let next = base.saturating_add(5).min(240);
+                        input.buffer = next.to_string();
+                    }
+                    KeyCode::Down | KeyCode::Left | KeyCode::Char('j') => {
+                        let base = input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
+                        let next = base.saturating_sub(5);
+                        input.buffer = next.to_string();
+                    }
+                    KeyCode::Char(_c) => {}
                     _ => {}
                 },
                 InputKind::Command => match code {
@@ -236,6 +320,12 @@ impl App {
                         self.day.adjust_estimate(self.selected, 5);
                     }
                     KeyCode::Down => {
+                        self.day.adjust_estimate(self.selected, -5);
+                    }
+                    KeyCode::Right => {
+                        self.day.adjust_estimate(self.selected, 5);
+                    }
+                    KeyCode::Left => {
                         self.day.adjust_estimate(self.selected, -5);
                     }
                     KeyCode::Char('k') => {
@@ -533,7 +623,10 @@ impl App {
 
     pub fn finish_active(&mut self) {
         if let Some(idx) = self.day.active_index() {
-            let ymd = self.last_seen_ymd;
+            // Use current date at the moment of finishing to respect test overrides
+            // set via CHUTE_KUN_TODAY. Avoid relying on cached last_seen_ymd here
+            // because tests may set the env var after App initialization.
+            let ymd = crate::date::today_ymd();
             let now = crate::clock::system_now_minutes();
             if let Some(t) = self.day.tasks.get_mut(idx) {
                 t.finished_at_min = Some(now);
@@ -549,7 +642,8 @@ impl App {
             return;
         }
         let idx = self.selected.min(self.day.tasks.len() - 1);
-        let ymd = self.last_seen_ymd;
+        // Use current date at the moment of finishing for the same reason as above.
+        let ymd = crate::date::today_ymd();
         let now = crate::clock::system_now_minutes();
         if let Some(t) = self.day.tasks.get_mut(idx) {
             t.finished_at_min = Some(now);
@@ -738,6 +832,9 @@ impl App {
     pub fn is_estimate_editing(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::EstimateEdit))
     }
+    pub fn is_new_task_estimate(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::NewTaskEstimate))
+    }
     pub fn is_command_mode(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::Command))
     }
@@ -753,6 +850,12 @@ impl App {
     }
     pub fn selected_estimate(&self) -> Option<u16> {
         self.day.tasks.get(self.selected).map(|t| t.estimate_min)
+    }
+    pub fn new_task_title(&self) -> Option<&str> {
+        self.new_task.as_ref().map(|d| d.title.as_str())
+    }
+    pub fn new_task_default_estimate(&self) -> Option<u16> {
+        self.new_task.as_ref().map(|d| d.default_estimate)
     }
     pub fn hovered_index(&self) -> Option<usize> {
         self.hovered
