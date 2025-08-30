@@ -474,6 +474,10 @@ impl App {
     }
 
     pub fn tick(&mut self, seconds: u16) {
+        // Freeze app time updates while a confirmation popup is open
+        if self.is_confirm_delete() {
+            return;
+        }
         // Sweep when the local date changes
         let today = today_ymd();
         if today != self.last_seen_ymd {
