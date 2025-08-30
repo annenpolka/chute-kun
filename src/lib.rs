@@ -10,3 +10,5 @@ pub mod task;
 pub mod ui;
 #[path = "lib/storage.rs"]
 pub mod storage;
+#[path = "lib/date.rs"]
+pub mod date;
