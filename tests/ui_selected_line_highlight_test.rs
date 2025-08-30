@@ -17,7 +17,7 @@ fn selected_line_has_background_highlight() {
     {
         let backend = terminal.backend();
         let buf = backend.buffer();
-    // Inner area starts at (1,1). Tabs are at y=1, list starts at y=2, help at bottom.
+        // Inner area starts at (1,1). Tabs are at y=1, list starts at y=2, help at bottom.
         let list_y_top = 2u16;
         let first_cell = buf.get(1, list_y_top); // leftmost cell of first list row
         assert!(

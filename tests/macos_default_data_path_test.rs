@@ -15,4 +15,3 @@ fn default_data_path_on_macos_prefers_xdg_like_local_share() {
     let path = default_state_path().expect("resolved path");
     assert_eq!(path, expected);
 }
-

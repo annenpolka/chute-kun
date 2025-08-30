@@ -1,0 +1,19 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cargo-fmt-check
+        name: cargo fmt --all -- --check
+        entry: cargo fmt --all -- --check
+        language: system
+        pass_filenames: false
+      - id: cargo-clippy-lint
+        name: cargo clippy (deny warnings)
+        entry: cargo lint
+        language: system
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test (workspace)
+        entry: bash -lc 'if [ -z "$SKIP_CARGO_TEST" ]; then cargo test --workspace --all-targets --all-features; else echo "[pre-commit] SKIP_CARGO_TEST set; skipping tests"; fi'
+        language: system
+        pass_filenames: false
+

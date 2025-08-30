@@ -21,4 +21,3 @@ fn default_path_on_macos_prefers_dot_config() {
     let s = std::fs::read_to_string(&written).unwrap();
     assert!(s.contains("day_start = \"09:00\""));
 }
-

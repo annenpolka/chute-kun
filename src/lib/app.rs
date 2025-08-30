@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::date::today_ymd;
 use crate::task::{DayPlan, Task};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum View {
@@ -55,7 +55,9 @@ struct Input {
 }
 
 impl App {
-    pub fn new() -> Self { Self::with_config(Config::load()) }
+    pub fn new() -> Self {
+        Self::with_config(Config::load())
+    }
 
     pub fn with_config(config: Config) -> Self {
         let ymd = today_ymd();
@@ -209,7 +211,9 @@ impl App {
 
     /// Finish the currently selected task regardless of its active state.
     pub fn finish_selected(&mut self) {
-        if self.day.tasks.is_empty() { return; }
+        if self.day.tasks.is_empty() {
+            return;
+        }
         let idx = self.selected.min(self.day.tasks.len() - 1);
         let ymd = self.last_seen_ymd;
         self.day.finish_at(idx, ymd);
@@ -349,7 +353,6 @@ impl App {
         self.view
     }
 
-
     // Input mode helpers for UI/tests
     pub fn in_input_mode(&self) -> bool {
         self.input.is_some()
@@ -399,7 +402,12 @@ impl App {
 impl App {
     /// Replace task lists from an external snapshot.
     /// - Resets selection and carry seconds; keeps config.
-    pub fn apply_snapshot(&mut self, today: Vec<crate::task::Task>, future: Vec<crate::task::Task>, past: Vec<crate::task::Task>) {
+    pub fn apply_snapshot(
+        &mut self,
+        today: Vec<crate::task::Task>,
+        future: Vec<crate::task::Task>,
+        past: Vec<crate::task::Task>,
+    ) {
         self.day = DayPlan::new(today);
         self.tomorrow = future;
         self.history = past;
@@ -408,7 +416,6 @@ impl App {
         // Ensure old done items are moved to Past on startup
         self.sweep_done_before(self.last_seen_ymd);
     }
-
 }
 
 impl App {
@@ -416,10 +423,7 @@ impl App {
     pub fn sweep_done_before(&mut self, ymd: u32) {
         let mut i = 0;
         while i < self.day.tasks.len() {
-            let move_to_past = match self.day.tasks[i].done_ymd {
-                Some(d) if d < ymd => true,
-                _ => false,
-            };
+            let move_to_past = matches!(self.day.tasks[i].done_ymd, Some(d) if d < ymd);
             if move_to_past {
                 if let Some(task) = self.day.remove(i) {
                     self.history.push(task);

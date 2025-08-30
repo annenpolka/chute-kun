@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] cargo fmt --check"
+cargo fmt-check
+
+echo "[pre-commit] cargo clippy -D warnings"
+cargo lint
+
+if [[ -z "${SKIP_CARGO_TEST:-}" ]]; then
+  echo "[pre-commit] cargo test (set SKIP_CARGO_TEST=1 to skip)"
+  cargo test --workspace --all-targets --all-features
+else
+  echo "[pre-commit] skipping cargo test due to SKIP_CARGO_TEST"
+fi
+

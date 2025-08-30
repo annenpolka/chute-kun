@@ -22,4 +22,3 @@ quit = "x"
     app.handle_key_event(ev);
     assert!(app.should_quit);
 }
-
