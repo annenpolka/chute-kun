@@ -55,7 +55,8 @@ pub fn draw(f: &mut Frame, app: &App) {
     // If we have an active banner, render it right below tabs
     let mut content_idx = 1usize; // index into chunks for main content
     if let Some(line) = active_banner {
-        let para = Paragraph::new(line);
+        // Underline the entire banner line for visibility
+        let para = Paragraph::new(line.patch_style(Modifier::UNDERLINED));
         f.render_widget(para, chunks[1]);
         content_idx = 2;
     }
@@ -363,7 +364,7 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     // Optional banner under tabs
     let mut content_idx = 1usize;
     if let Some(line) = active_banner {
-        let para = Paragraph::new(line);
+        let para = Paragraph::new(line.patch_style(Modifier::UNDERLINED));
         f.render_widget(para, chunks[1]);
         content_idx = 2;
     }
@@ -451,18 +452,21 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
     }
     // active index not needed for seconds rendering anymore (per-task seconds)
 
-    // Build schedule start times from `now_min`, adding remaining durations of preceding tasks.
+    // Build schedule start times from `now_min`, adding durations of preceding tasks.
+    // ポイント: Done(完了) タスクも「見積時間(estimate_min)」で次以降のPlanを押し出す。
     let mut cursor = now_min;
     let starts: Vec<u16> = tasks
         .iter()
         .map(|t| {
             let this = cursor;
-            // remaining minutes for this task (ignoring partial seconds for simplicity)
-            let remaining = match t.state {
-                TaskState::Done => 0,
+            // remaining/planned minutes for this task (ignore partial seconds).
+            // - Done: use estimate to keep planned schedule consistent with original plan
+            // - Others: use remaining = estimate - actual
+            let delta = match t.state {
+                TaskState::Done => t.estimate_min,
                 _ => t.estimate_min.saturating_sub(t.actual_min),
             };
-            cursor = cursor.saturating_add(remaining);
+            cursor = cursor.saturating_add(delta);
             this
         })
         .collect();
@@ -530,11 +534,11 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         .iter()
         .map(|t| {
             let this = cursor;
-            let remaining = match t.state {
-                TaskState::Done => 0,
+            let delta = match t.state {
+                TaskState::Done => t.estimate_min,
                 _ => t.estimate_min.saturating_sub(t.actual_min),
             };
-            cursor = cursor.saturating_add(remaining);
+            cursor = cursor.saturating_add(delta);
             this
         })
         .collect();
@@ -546,9 +550,13 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         let mm = starts[i] % 60;
         let planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
         let actual_cell = Cell::from(format_actual_last_finish_time(t));
-        // Title: drop seconds (moved to dedicated Act column) but keep estimate
-        let title_cell =
-            Cell::from(format!("{} {} (est:{}m)", state_icon(t.state), t.title, t.estimate_min,));
+        // Title cell with colored state icon and plain title/estimate
+        let mut spans: Vec<Span> = Vec::new();
+        spans.push(state_icon_span(t.state));
+        spans.push(Span::raw(" "));
+        spans.push(Span::raw(t.title.clone()));
+        spans.push(Span::raw(format!(" (est:{}m)", t.estimate_min)));
+        let title_cell = Cell::from(Line::from(spans));
         // New dedicated accumulated time column with seconds
         let secs = if matches!(t.state, TaskState::Active | TaskState::Paused) {
             t.actual_carry_sec
@@ -598,6 +606,17 @@ fn state_icon(state: TaskState) -> &'static str {
         TaskState::Paused => "=",
         TaskState::Done => "x",
     }
+}
+
+fn state_icon_span(state: TaskState) -> Span<'static> {
+    let sym = state_icon(state).to_string();
+    let style = match state {
+        TaskState::Active => Style::default().fg(Color::Green),
+        TaskState::Paused => Style::default().fg(Color::Yellow),
+        TaskState::Done => Style::default().fg(Color::DarkGray),
+        TaskState::Planned => Style::default(),
+    };
+    Span::styled(sym, style)
 }
 
 /// Colorful, lazygit-inspired title line for the outer `Block`.
@@ -768,8 +787,9 @@ pub fn format_active_banner(app: &App) -> Option<Line<'static>> {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
     ));
     line.spans.push(Span::raw(" "));
-    line.spans.push(Span::raw(state_icon(t.state).to_string()));
+    line.spans.push(state_icon_span(t.state));
     line.spans.push(Span::raw(" "));
+    // Running task title (no underline here; banner is underlined as a whole)
     line.spans.push(Span::styled(t.title.clone(), Style::default().fg(Color::Cyan)));
     line.spans.push(Span::raw(format!(
         " (est:{}m act:{}m {}s)",
