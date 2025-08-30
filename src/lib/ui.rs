@@ -572,9 +572,13 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         let mm = starts[i] % 60;
         let planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
         let actual_cell = Cell::from(format_actual_last_finish_time(t));
-        // Title: drop seconds (moved to dedicated Act column) but keep estimate
-        let title_cell =
-            Cell::from(format!("{} {} (est:{}m)", state_icon(t.state), t.title, t.estimate_min,));
+        // Title cell with colored state icon and plain title/estimate
+        let mut spans: Vec<Span> = Vec::new();
+        spans.push(state_icon_span(t.state));
+        spans.push(Span::raw(" "));
+        spans.push(Span::raw(t.title.clone()));
+        spans.push(Span::raw(format!(" (est:{}m)", t.estimate_min)));
+        let title_cell = Cell::from(Line::from(spans));
         // New dedicated accumulated time column with seconds
         let secs = if matches!(t.state, TaskState::Active | TaskState::Paused) {
             t.actual_carry_sec
@@ -624,6 +628,17 @@ fn state_icon(state: TaskState) -> &'static str {
         TaskState::Paused => "=",
         TaskState::Done => "x",
     }
+}
+
+fn state_icon_span(state: TaskState) -> Span<'static> {
+    let sym = state_icon(state).to_string();
+    let style = match state {
+        TaskState::Active => Style::default().fg(Color::Green),
+        TaskState::Paused => Style::default().fg(Color::Yellow),
+        TaskState::Done => Style::default().fg(Color::DarkGray),
+        TaskState::Planned => Style::default(),
+    };
+    Span::styled(sym, style)
 }
 
 /// Colorful, lazygit-inspired title line for the outer `Block`.
@@ -794,7 +809,7 @@ pub fn format_active_banner(app: &App) -> Option<Line<'static>> {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
     ));
     line.spans.push(Span::raw(" "));
-    line.spans.push(Span::raw(state_icon(t.state).to_string()));
+    line.spans.push(state_icon_span(t.state));
     line.spans.push(Span::raw(" "));
     line.spans.push(Span::styled(t.title.clone(), Style::default().fg(Color::Cyan)));
     line.spans.push(Span::raw(format!(
