@@ -8,7 +8,7 @@
 - スクリプト: なし（`cargo run` / `cargo test` を利用）
 
 ## 実行・テスト
-- 実行: `cargo run`（`Enter` で開始、`Space` 一時停止、`Shift+Enter` 完了、`p` 翌日送り、`q` 終了）
+- 実行: `cargo run`（`Enter` で開始/一時停止をトグル、`Shift+Enter` 完了、`p` 翌日送り、`q` 終了）
 - テスト: `cargo test`
 
 ## 主要ファイル
