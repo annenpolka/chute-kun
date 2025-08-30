@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Tabs, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Tabs, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -71,6 +71,33 @@ pub fn draw(f: &mut Frame, app: &App) {
             .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
     }
+
+    // Overlay: centered delete confirmation popup with colored text
+    if app.is_confirm_delete() {
+        // Compute message and popup size within the inner area
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
+        let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+        let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
+        let popup_h: u16 = 3;
+        let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+        let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+        let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
+
+        let border_style = Style::default().fg(Color::Red);
+        let title = Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner_popup = block.inner(popup);
+        let para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
+        f.render_widget(para, inner_popup);
+    }
 }
 
 /// Like `draw`, but uses an injected `Clock` for current time.
@@ -128,6 +155,32 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
             .style(Style::default().fg(Color::DarkGray))
             .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
+    }
+
+    // Overlay: centered delete confirmation popup with colored text
+    if app.is_confirm_delete() {
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
+        let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+        let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
+        let popup_h: u16 = 3;
+        let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+        let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+        let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
+
+        let border_style = Style::default().fg(Color::Red);
+        let title = Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner_popup = block.inner(popup);
+        let para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
+        f.render_widget(para, inner_popup);
     }
 }
 
