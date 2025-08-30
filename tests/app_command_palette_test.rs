@@ -11,7 +11,9 @@ fn command_palette_est_relative() {
     app.handle_key(KeyCode::Char(':'));
     let lines = ui::format_task_lines(&app);
     assert!(lines.first().unwrap().starts_with("Command:"));
-    for c in "est +15m".chars() { app.handle_key(KeyCode::Char(c)); }
+    for c in "est +15m".chars() {
+        app.handle_key(KeyCode::Char(c));
+    }
     app.handle_key(KeyCode::Enter);
 
     assert_eq!(app.day.tasks[0].estimate_min, 35);
@@ -24,9 +26,10 @@ fn command_palette_est_absolute() {
     app.add_task("A", 20);
 
     app.handle_key(KeyCode::Char(':'));
-    for c in "est 90m".chars() { app.handle_key(KeyCode::Char(c)); }
+    for c in "est 90m".chars() {
+        app.handle_key(KeyCode::Char(c));
+    }
     app.handle_key(KeyCode::Enter);
 
     assert_eq!(app.day.tasks[0].estimate_min, 90);
 }
-

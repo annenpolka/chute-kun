@@ -156,7 +156,8 @@ impl App {
             KeyCode::Char('E') => {
                 // Enter estimate edit mode if a task is available
                 if !self.day.tasks.is_empty() {
-                    self.input = Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                    self.input =
+                        Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
             }
             KeyCode::Char('i') => {
@@ -204,7 +205,8 @@ impl App {
             KeyCode::Char('e') => {
                 // Open estimate edit mode
                 if !self.day.tasks.is_empty() {
-                    self.input = Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                    self.input =
+                        Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
             }
             KeyCode::Char('p') => {
@@ -324,7 +326,8 @@ impl App {
             A::EstimatePlus => {
                 // Repurpose to open estimate editor for backward compatibility with config name
                 if !self.day.tasks.is_empty() {
-                    self.input = Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                    self.input =
+                        Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
             }
             A::Postpone => {
@@ -508,9 +511,15 @@ impl App {
     fn apply_command(&mut self, cmd: &str) {
         // Supported: "est +15m", "est -5", "est 90m"
         let mut it = cmd.split_whitespace();
-        let Some(head) = it.next() else { return; };
-        if head != "est" { return; }
-        let Some(arg) = it.next() else { return; };
+        let Some(head) = it.next() else {
+            return;
+        };
+        if head != "est" {
+            return;
+        }
+        let Some(arg) = it.next() else {
+            return;
+        };
         let s = arg.trim();
         if s.starts_with('+') || s.starts_with('-') {
             // relative delta

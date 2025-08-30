@@ -43,12 +43,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     // Main content: if in stepper, render a styled line with highlighted minutes
     if app.is_estimate_editing() {
         let est = app.selected_estimate().unwrap_or(0);
-        let title = app
-            .day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.title.as_str())
-            .unwrap_or("");
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
         let mut line = Line::default();
         line.spans.push(Span::raw("Estimate: "));
         line.spans.push(Span::styled(
@@ -159,31 +154,17 @@ pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
         // Estimate edit mode shows explicit stepper line with task title
         if app.is_estimate_editing() {
             let est = app.selected_estimate().unwrap_or(0);
-            let title = app
-                .day
-                .tasks
-                .get(app.selected_index())
-                .map(|t| t.title.as_str())
-                .unwrap_or("");
+            let title =
+                app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
             let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!(
-                "Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)",
-                est, suffix
-            )];
+            return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
         }
         // Command palette prompt (+ show target task title)
         if app.is_command_mode() {
-            let title = app
-                .day
-                .tasks
-                .get(app.selected_index())
-                .map(|t| t.title.as_str())
-                .unwrap_or("");
+            let title =
+                app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
             let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!(
-                "Command: {} _{}  (Enter=Run Esc=Cancel)",
-                buf, suffix
-            )];
+            return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
         }
         // Fallback: normal input mode for adding a task
         return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
@@ -283,7 +264,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | b: bring | [: up | ]: down | e: +5m";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | b: bring | [: up | ]: down | e: edit | j/k";
     format!("{} | {}", nav, task)
 }
 
@@ -310,7 +291,8 @@ pub fn help_items_for(app: &App) -> Vec<&'static str> {
             "p: postpone",
             "[: up",
             "]: down",
-            "e: +5m",
+            "e: edit",
+            "j/k",
         ]);
     }
     items
