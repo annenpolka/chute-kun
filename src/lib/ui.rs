@@ -74,9 +74,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             line.spans.push(Span::raw(" — "));
             line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
         }
-        line.spans.push(Span::raw(
-            "  (←/→ or j/k to adjust; click slider; Enter=OK Esc=Cancel)",
-        ));
+        line.spans.push(Span::raw("  (←/→ or j/k to adjust; click slider; Enter=OK Esc=Cancel)"));
         let para = Paragraph::new(line);
         f.render_widget(para, chunks[content_idx]);
     } else if app.is_new_task_estimate() {
@@ -96,9 +94,8 @@ pub fn draw(f: &mut Frame, app: &App) {
             line.spans.push(Span::raw(" — "));
             line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
         }
-        line.spans.push(Span::raw(
-            "  (←/→ or j/k to adjust; click/drag slider; Enter=OK Esc=Cancel)",
-        ));
+        line.spans
+            .push(Span::raw("  (←/→ or j/k to adjust; click/drag slider; Enter=OK Esc=Cancel)"));
         let para = Paragraph::new(line);
         f.render_widget(para, chunks[content_idx]);
     } else if app.in_input_mode() {
@@ -905,9 +902,15 @@ pub fn compute_estimate_popup_rect(app: &App, area: Rect) -> Option<Rect> {
 
 // Slider hitboxes for estimate editor
 pub fn estimate_slider_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
-    let inner = Rect { x: popup.x + 1, y: popup.y + 1, width: popup.width.saturating_sub(2), height: popup.height.saturating_sub(2) };
+    let inner = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
     let track_y = inner.y + 1;
-    let track = Rect { x: inner.x + 2, y: track_y, width: inner.width.saturating_sub(4), height: 1 };
+    let track =
+        Rect { x: inner.x + 2, y: track_y, width: inner.width.saturating_sub(4), height: 1 };
     let ok_w = UnicodeWidthStr::width("OK") as u16;
     let ca_w = UnicodeWidthStr::width("Cancel") as u16;
     let total = ok_w + 2 + ca_w;
@@ -967,7 +970,11 @@ pub fn compute_new_task_estimate_popup_rect(app: &App, area: Rect) -> Option<Rec
         .or_else(|| app.new_task_default_estimate())
         .unwrap_or(25);
     let title = app.new_task_title().unwrap_or("");
-    let msg = if title.is_empty() { format!("Estimate: {}m", est) } else { format!("Estimate: {}m — {}", est, title) };
+    let msg = if title.is_empty() {
+        format!("Estimate: {}m", est)
+    } else {
+        format!("Estimate: {}m — {}", est, title)
+    };
     let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
     let popup_w = content_w.saturating_add(4).min(inner.width).max(34).min(inner.width);
     let popup_h: u16 = 5;
@@ -1008,7 +1015,10 @@ fn render_slider_line(f: &mut Frame, track: Rect, minutes: u16) {
     line.spans.push(Span::styled("[".to_string(), Style::default().fg(Color::DarkGray)));
     for x in track.x..track.x + track.width {
         if x == knob_x {
-            line.spans.push(Span::styled("●".to_string(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
+            line.spans.push(Span::styled(
+                "●".to_string(),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            ));
         } else if x < knob_x {
             line.spans.push(Span::styled("=".to_string(), Style::default().fg(Color::Green)));
         } else {

@@ -118,7 +118,8 @@ impl App {
                             None
                         };
                     }
-                    MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {
+                    MouseEventKind::Down(MouseButton::Left)
+                    | MouseEventKind::Drag(MouseButton::Left) => {
                         let pos = (ev.column, ev.row);
                         if point_in_rect(pos.0, pos.1, track) {
                             let m = crate::ui::minutes_from_slider_x(track, 0, 240, 5, pos.0);
@@ -148,10 +149,12 @@ impl App {
                             None
                         };
                     }
-                    MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {
+                    MouseEventKind::Down(MouseButton::Left)
+                    | MouseEventKind::Drag(MouseButton::Left) => {
                         let pos = (ev.column, ev.row);
                         // Allow clicking on the slider track to set value
-                        let (track, _ok2, _cancel2) = crate::ui::estimate_slider_hitboxes(self, popup);
+                        let (track, _ok2, _cancel2) =
+                            crate::ui::estimate_slider_hitboxes(self, popup);
                         if point_in_rect(pos.0, pos.1, track) {
                             let m = crate::ui::minutes_from_slider_x(track, 0, 240, 5, pos.0);
                             if let Some(inp) = self.input.as_mut() {
@@ -244,12 +247,10 @@ impl App {
                             input.buffer.trim().to_string()
                         };
                         // Move to estimate entry step with default prefilled
-                        self.new_task = Some(NewTaskDraft {
-                            source: input.kind,
-                            title,
-                            default_estimate: est,
-                        });
-                        self.input = Some(Input { kind: InputKind::NewTaskEstimate, buffer: String::new() });
+                        self.new_task =
+                            Some(NewTaskDraft { source: input.kind, title, default_estimate: est });
+                        self.input =
+                            Some(Input { kind: InputKind::NewTaskEstimate, buffer: String::new() });
                     }
                     KeyCode::Esc => {
                         self.input = None;
@@ -284,12 +285,14 @@ impl App {
                         input.buffer.pop();
                     }
                     KeyCode::Up | KeyCode::Right | KeyCode::Char('k') => {
-                        let base = input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
+                        let base =
+                            input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
                         let next = base.saturating_add(5).min(240);
                         input.buffer = next.to_string();
                     }
                     KeyCode::Down | KeyCode::Left | KeyCode::Char('j') => {
-                        let base = input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
+                        let base =
+                            input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
                         let next = base.saturating_sub(5);
                         input.buffer = next.to_string();
                     }
