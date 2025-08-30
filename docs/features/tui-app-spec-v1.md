@@ -24,6 +24,7 @@
 - Reorder: `Alt+↑/↓`（または `[`/`]`）
 - Edit Estimate: `e`（数値分）
 - Postpone(持越し): `p`（翌日へ/日時指定）
+- Bring from Future: `b`（Future から Today へ戻す）
 - New Task 入力モード: `i`（タイトルを入力→`Enter`で追加、`Esc`でキャンセル、`Backspace`で編集）
 - Interrupt 入力モード: `I`（同上／デフォ見積は15m）
 - Split(分割): `s`
