@@ -1,7 +1,9 @@
 use crate::config::Config;
 use crate::date::today_ymd;
 use crate::task::{DayPlan, Task};
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::Rect;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum View {
@@ -40,6 +42,11 @@ pub struct App {
     input: Option<Input>,
     pub config: Config,
     last_seen_ymd: u32,
+    // Mouse UI state
+    hovered: Option<usize>,
+    hovered_tab: Option<usize>,
+    popup_hover: Option<PopupButton>,
+    last_click: Option<LastClick>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +65,98 @@ struct Input {
 }
 
 impl App {
+    fn handle_mouse_in_popup(&mut self, ev: MouseEvent, area: Rect) {
+        // Delete confirmation
+        if self.is_confirm_delete() {
+            if let Some(popup) = crate::ui::compute_delete_popup_rect(self, area) {
+                let (del_btn, cancel_btn) = crate::ui::delete_popup_button_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        self.popup_hover = if point_in_rect(pos.0, pos.1, del_btn) {
+                            Some(PopupButton::Delete)
+                        } else if point_in_rect(pos.0, pos.1, cancel_btn) {
+                            Some(PopupButton::Cancel)
+                        } else {
+                            None
+                        };
+                    }
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        if point_in_rect(pos.0, pos.1, del_btn) {
+                            self.delete_selected();
+                            self.input = None;
+                        } else if point_in_rect(pos.0, pos.1, cancel_btn) {
+                            self.input = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else if self.is_estimate_editing() {
+            // Estimate editor
+            if let Some(popup) = crate::ui::compute_estimate_popup_rect(self, area) {
+                let (minus, plus, ok, cancel) =
+                    crate::ui::estimate_popup_button_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        self.popup_hover = if point_in_rect(pos.0, pos.1, minus) {
+                            Some(PopupButton::EstMinus)
+                        } else if point_in_rect(pos.0, pos.1, plus) {
+                            Some(PopupButton::EstPlus)
+                        } else if point_in_rect(pos.0, pos.1, ok) {
+                            Some(PopupButton::EstOk)
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            Some(PopupButton::EstCancel)
+                        } else {
+                            None
+                        };
+                    }
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        if point_in_rect(pos.0, pos.1, minus) {
+                            self.day.adjust_estimate(self.selected, -5);
+                        } else if point_in_rect(pos.0, pos.1, plus) {
+                            self.day.adjust_estimate(self.selected, 5);
+                        } else if point_in_rect(pos.0, pos.1, ok)
+                            || point_in_rect(pos.0, pos.1, cancel)
+                        {
+                            self.input = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else if self.in_input_mode() && !self.is_command_mode() {
+            // Task name input (Normal/Interrupt)
+            if let Some(popup) = crate::ui::compute_input_popup_rect(self, area) {
+                let (add, cancel) = crate::ui::input_popup_button_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        self.popup_hover = if point_in_rect(pos.0, pos.1, add) {
+                            Some(PopupButton::InputAdd)
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            Some(PopupButton::InputCancel)
+                        } else {
+                            None
+                        };
+                    }
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        if point_in_rect(pos.0, pos.1, add) {
+                            // Reuse key handling to submit
+                            self.handle_key(KeyCode::Enter);
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            self.input = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
     pub fn new() -> Self {
         Self::with_config(Config::load())
     }
@@ -75,6 +174,10 @@ impl App {
             input: None,
             config,
             last_seen_ymd: ymd,
+            hovered: None,
+            hovered_tab: None,
+            popup_hover: None,
+            last_click: None,
         }
     }
 
@@ -288,6 +391,124 @@ impl App {
         self.handle_key(ev.code);
     }
 
+    /// Handle mouse events using the current terminal area to map coordinates to UI regions.
+    /// - Left click on a list row selects that task; double-click toggles start/pause.
+    /// - Right click on a list row opens estimate edit.
+    /// - Clicking tabs switches views.
+    /// - Mouse move updates hover index.
+    /// - Ignores clicks while in input/popup modes.
+    pub fn handle_mouse_event(&mut self, ev: MouseEvent, area: Rect) {
+        if self.in_input_mode() || self.is_confirm_delete() {
+            self.handle_mouse_in_popup(ev, area);
+            return;
+        }
+        let (tabs, _banner, list, _help) = crate::ui::compute_layout(self, area);
+        match ev.kind {
+            MouseEventKind::Moved => {
+                self.update_hover_from_coords(ev.column, ev.row, list);
+                // Tab hover
+                if ev.row == tabs.y {
+                    let boxes = crate::ui::tab_hitboxes(self, tabs);
+                    let mut hit = None;
+                    for (i, r) in boxes.iter().enumerate() {
+                        if point_in_rect(ev.column, ev.row, *r) {
+                            hit = Some(i);
+                            break;
+                        }
+                    }
+                    self.hovered_tab = hit;
+                } else {
+                    self.hovered_tab = None;
+                }
+            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                // Tabs click
+                if ev.row == tabs.y {
+                    let boxes = crate::ui::tab_hitboxes(self, tabs);
+                    let mut clicked = None;
+                    for (i, r) in boxes.iter().enumerate() {
+                        if point_in_rect(ev.column, ev.row, *r) {
+                            clicked = Some(i);
+                            break;
+                        }
+                    }
+                    match clicked {
+                        Some(0) => self.set_view(View::Past),
+                        Some(1) => self.set_view(View::Today),
+                        Some(2) => self.set_view(View::Future),
+                        _ => {}
+                    }
+                    return;
+                }
+                // List click
+                if ev.row < list.y || ev.row >= list.y.saturating_add(list.height) {
+                    return;
+                }
+                let idx = self.index_from_list_row(ev.row, list);
+                self.selected = idx;
+                // Detect double-click
+                let now = Instant::now();
+                const THRESHOLD_MS: u128 = 600;
+                let is_double = matches!(
+                    self.last_click,
+                    Some(LastClick { when, index, button: MouseButton::Left })
+                        if index == idx && now.duration_since(when).as_millis() <= THRESHOLD_MS
+                );
+                if is_double {
+                    self.toggle_task_start_pause(idx);
+                    // Reset so the second Down of the pair doesn't trigger again
+                    self.last_click = None;
+                } else {
+                    self.last_click =
+                        Some(LastClick { when: now, index: idx, button: MouseButton::Left });
+                }
+            }
+            MouseEventKind::Down(MouseButton::Right) => {
+                // Right click opens estimate editor on the clicked row
+                if ev.row < list.y || ev.row >= list.y.saturating_add(list.height) {
+                    return;
+                }
+                let idx = self.index_from_list_row(ev.row, list);
+                self.selected = idx;
+                if !self.day.tasks.is_empty() {
+                    self.input =
+                        Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// For tests: update hover by coordinates without constructing a MouseEvent.
+    pub fn handle_mouse_move(&mut self, col: u16, row: u16, area: Rect) {
+        let (tabs, _banner, list, _help) = crate::ui::compute_layout(self, area);
+        self.update_hover_from_coords(col, row, list);
+        // Tabs hover
+        if row == tabs.y {
+            let boxes = crate::ui::tab_hitboxes(self, tabs);
+            self.hovered_tab = boxes
+                .iter()
+                .enumerate()
+                .find(|(_, r)| point_in_rect(col, row, **r))
+                .map(|(i, _)| i);
+        } else {
+            self.hovered_tab = None;
+        }
+        // Popup hover
+        if self.is_confirm_delete() {
+            if let Some(popup) = crate::ui::compute_delete_popup_rect(self, area) {
+                let (del_btn, cancel_btn) = crate::ui::delete_popup_button_hitboxes(self, popup);
+                if point_in_rect(col, row, del_btn) {
+                    self.popup_hover = Some(PopupButton::Delete);
+                } else if point_in_rect(col, row, cancel_btn) {
+                    self.popup_hover = Some(PopupButton::Cancel);
+                } else {
+                    self.popup_hover = None;
+                }
+            }
+        }
+    }
+
     /// Handle pasted text from the terminal (bracketed/kitty paste etc.).
     /// Appends to the input buffer only when in input mode.
     pub fn handle_paste(&mut self, s: &str) {
@@ -435,7 +656,10 @@ impl App {
         if len == 0 {
             return;
         }
-        self.selected = self.selected.saturating_sub(1);
+        let new = self.selected.saturating_sub(1);
+        if new != self.selected {
+            self.selected = new;
+        }
     }
     pub fn select_down(&mut self) {
         let len = self.current_len();
@@ -443,7 +667,10 @@ impl App {
             return;
         }
         let last = len - 1;
-        self.selected = (self.selected + 1).min(last);
+        let new = (self.selected + 1).min(last);
+        if new != self.selected {
+            self.selected = new;
+        }
     }
 
     pub fn postpone_selected(&mut self) {
@@ -507,8 +734,24 @@ impl App {
     pub fn is_confirm_delete(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::ConfirmDelete))
     }
+    /// True only when typing a task title (Normal/Interrupt), not for estimate/confirm popups.
+    pub fn is_text_input_mode(&self) -> bool {
+        matches!(
+            self.input.as_ref().map(|i| i.kind),
+            Some(InputKind::Normal | InputKind::Interrupt)
+        )
+    }
     pub fn selected_estimate(&self) -> Option<u16> {
         self.day.tasks.get(self.selected).map(|t| t.estimate_min)
+    }
+    pub fn hovered_index(&self) -> Option<usize> {
+        self.hovered
+    }
+    pub fn hovered_tab_index(&self) -> Option<usize> {
+        self.hovered_tab
+    }
+    pub fn popup_hover_button(&self) -> Option<PopupButton> {
+        self.popup_hover
     }
 
     fn set_view(&mut self, v: View) {
@@ -520,6 +763,7 @@ impl App {
         } else {
             self.selected = self.selected.min(len - 1);
         }
+        self.hovered = None;
     }
 
     fn current_len(&self) -> usize {
@@ -639,4 +883,57 @@ impl App {
             }
         }
     }
+}
+
+impl App {
+    fn toggle_task_start_pause(&mut self, idx: usize) {
+        if self.day.active_index() == Some(idx) {
+            self.day.pause_active();
+        } else {
+            self.day.start(idx);
+            self.selected = idx;
+        }
+    }
+
+    fn index_from_list_row(&self, row: u16, list: Rect) -> usize {
+        let rel = row.saturating_sub(list.y) as usize;
+        let len = self.current_len();
+        rel.min(len.saturating_sub(1))
+    }
+
+    fn update_hover_from_coords(&mut self, col: u16, row: u16, list: Rect) {
+        if row >= list.y
+            && row < list.y.saturating_add(list.height)
+            && col >= list.x
+            && col < list.x + list.width
+        {
+            let idx = self.index_from_list_row(row, list);
+            self.hovered = Some(idx);
+        } else {
+            self.hovered = None;
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LastClick {
+    when: Instant,
+    index: usize,
+    button: MouseButton,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PopupButton {
+    Delete,
+    Cancel,
+    EstMinus,
+    EstPlus,
+    EstOk,
+    EstCancel,
+    InputAdd,
+    InputCancel,
+}
+
+fn point_in_rect(x: u16, y: u16, r: Rect) -> bool {
+    x >= r.x && x < r.x.saturating_add(r.width) && y >= r.y && y < r.y.saturating_add(r.height)
 }
