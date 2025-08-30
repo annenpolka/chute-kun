@@ -1,38 +1,29 @@
-# TUI アプリ仕様（初版）
+# TUI アプリ仕様（初版 / 現状）
 
-*最終更新: 2025-08-29*
+最終更新: 2025-08-30
 
 ## 目的/スコープ
-- タスクシュートの「プラン/ログ/ルーチン」を、Todoist と連携するTUIで実現する。
-- MVPではLLMや高度な最適化を除外し、手動運用 + 正確なログと見積/実績の見える化を最優先。
+- タスクシュートの「プラン/ログ」をローカル TUI で実現する。
+- 現在の MVP はオフライン完結（TOML スナップショット保存）。外部 API/LLM は範囲外（将来の拡張）。
 
 ## 画面構成
-- ヘッダ: `YYYY-MM-DD (曜日) 現在時刻 | 見積合計/実績合計 | 見込み終了時刻 | 余裕(±分)`
+- ヘッダ: `YYYY-MM-DD` ベース情報 + 見積合計/実績合計 + ESD（見込み終了時刻）
 - メインリスト（Today Queue／ratatui::Table）:
-  - 左から順にカラム: `Plan(予定時刻)` / `Actual(実測ログ)` / `Task(状態+タイトル+見積/実績)`
-  - `Actual` は `HH:MM-HH:MM, ...` のセッション列をフルで表示（幅内で省略あり）
-  - 選択行は行背景でハイライト
-  - フィルタ: セクション/プロジェクト/ラベル
-- 詳細ペイン（トグル）:
-  - タスク詳細: 説明、ラベル、プロジェクト/セクション
-  - セッションログ: `開始-終了 (分) メモ`
-- サイドペイン（トグル）:
-  - Routine ライブラリ / History（過去n日）/ Inbox
+  - カラム: `Plan(予定時刻)` / `Actual(実測要約)` / `Task(状態+タイトル+見積/実績)`
+  - 選択行の背景ハイライト、ホバー表示、空時のヒント表示
+- 詳細/フィルタ等は将来拡張（現状は未実装）
 
-## キー操作（MVP）
-- Start/Pause (toggle): `Enter`
-- Finish(Complete): `Shift+Enter`
-- Navigate(選択移動): `↑/↓` または `j/k`
-- Reorder: `Alt+↑/↓`（または `[`/`]`）
-- Edit Estimate: `e`（数値分）
-- Postpone(持越し): `p`（翌日へ/日時指定）
-- Delete(削除): `x`（中央ポップアップ/赤系カラーの確認ダイアログ: Enter=Delete / Esc=Cancel）
-- Bring from Future: `b`（Future から Today へ戻す）
-- New Task 入力モード: `i`（タイトルを入力→`Enter`で追加、`Esc`でキャンセル、`Backspace`で編集）
-- Interrupt 入力モード: `I`（同上／デフォ見積は15m）
-- Split(分割): `s`
-- Toggle Detail: `d`
-- Filter/Search: `/`
+## キー操作（既定）
+- Start/Pause/Resume: `Enter`
+- Finish（選択タスク）: `Shift+Enter`（代替: `f`）
+- Navigate: `↑/↓` または `j/k`
+- Reorder: `[` / `]`
+- Edit Estimate: `e`（±5m ステッパー）
+- Postpone（翌日へ）: `p`
+- Bring from Future: `b`
+- New Task: `i`（入力モード）
+- Interrupt: `I`（入力モード／デフォ 15m）
+- Delete（確認ダイアログ）: `x`（Enter=Delete / Esc=Cancel）
 - Quit: `q`
 
 （注）キーバインドは後続実装で微調整可。原則として片手操作と視線移動最小化を重視。
@@ -56,29 +47,25 @@
 - デフォルト見積: New Task=25m、Interrupt=15m。
 - タイトル未入力で `Enter` の場合はそれぞれ `New Task` / `Interrupt` で作成。
 
-## Todoist 連携（プロトコル）
-- 認証: API Token（環境変数）。
-- 取得: 今日対象のタスク（プロジェクト/フィルタ条件は設定可能）。
-- 更新: コメントに `tc-log` を追記、説明に `tc:` メタを保持。
-- 完了: Todoist を完了状態に同期（任意設定で「TUI完了=Todoist完了」）。
-- ルーチン: 繰り返し due を活用。必要に応じて TUI 側で当日生成をトリガー。
+## 外部連携（将来）
+- Todoist 取得/完了/コメント追記、ルーチン当日生成 等はバックログ。
 
 ## エラー/オフライン指針
 - オフライン時はローカルキューに書き込み、再接続で差分同期。
 - 衝突は「最後のユーザー操作優先 + マージ（コメント追記）」を基本。
 
-## MVP 受け入れ基準
-- [ ] Today キュー表示（状態/見積/実績/ETA）
-- [ ] Start/Pause/Resume/Finish が動作し、ログが Todoist コメントに残る
-- [ ] Reorder/Estimate編集/Interrupt/持越しが可能
-- [ ] ESDと余裕の算出が正しい（単体テストで検証）
-- [ ] ルーチンの当日生成が行える（最小形）
+## MVP 受け入れ基準（現状）
+- [x] Today キュー表示（状態/見積/実績/ESD）
+- [x] Start/Pause/Resume/Finish が動作し、セッション/実績が更新される
+- [x] Reorder/Estimate 編集/Interrupt/持越し/Bring が可能
+- [x] ESD の計算が正しい（単体テストで検証）
+- [x] スナップショットの保存/読み込み（TOML）
 
 ## 非対象（初版）
-- LLMによる見積自動化/優先度最適化
+- LLM による見積自動化/優先最適化
 - マルチデイの自動再配置/自動リスケ
 - 外部カレンダー双方向同期
 
 ## 参考
 - 再調査メモ: `docs/research/taskchute-research-2025-08.md`
-- Todoist API: `docs/adr/ADR-001-TaskManagementAPI-Selection.md`
+- Todoist API（将来検討）: `docs/adr/ADR-001-TaskManagementAPI-Selection.md`

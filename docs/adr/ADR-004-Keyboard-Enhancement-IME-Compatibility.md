@@ -19,7 +19,7 @@ TUI では `crossterm` の Progressive Keyboard Enhancement を用いると、�
 
 さらに、ターミナルからの `Paste` イベントを取り込み、入力モード時は貼り付け文字列をそのままバッファに追記する（日本語含む）。
 
-該当実装:
+該当実装（crossterm 0.29 系）:
 
 - `src/cli/main.rs` のキーボード拡張フラグ設定を上記 2 つに限定
 - `src/cli/main.rs` に `Event::Paste` ハンドリングを追加
