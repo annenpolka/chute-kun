@@ -12,6 +12,7 @@ fn today_help_includes_task_actions() {
     assert!(s.contains("start/pause"));
     assert!(s.contains("i: interrupt"));
     assert!(s.contains("e: edit"));
+    assert!(s.contains("j/k"));
     assert!(s.contains("p: postpone"));
     // navigation and quit still present
     assert!(s.contains("Tab"));
