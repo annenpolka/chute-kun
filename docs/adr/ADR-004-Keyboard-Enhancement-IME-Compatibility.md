@@ -24,6 +24,8 @@ TUI では `crossterm` の Progressive Keyboard Enhancement を用いると、�
 - `src/cli/main.rs` のキーボード拡張フラグ設定を上記 2 つに限定
 - `src/cli/main.rs` に `Event::Paste` ハンドリングを追加
 - `src/lib/app.rs` に `App::handle_paste(&str)` を追加
+- `src/lib/app.rs` の `handle_key_event` では `KeyEventKind::Release` を無視（Press/Repeat のみ処理）し、
+  一部ターミナル（iTerm2/Ghostty 等）が Press と Release の両方を報告する際の二重入力を防止する
 
 ## 根拠
 - IME 入力（日本語）は CLI/TUI の主要ユースケースであり、入力の信頼性を最優先する
@@ -47,4 +49,3 @@ TUI では `crossterm` の Progressive Keyboard Enhancement を用いると、�
   - https://docs.rs/crossterm/latest/crossterm/event/enum.Event.html#variant.Paste
 - Kitty/CSI-u に関する背景資料（参考）
   - https://sw.kovidgoyal.net/kitty/keyboard-protocol/
-
