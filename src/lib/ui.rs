@@ -18,7 +18,13 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     // Pre-compute wrapped help lines for current width, to size the layout.
     let help_lines = help_lines_for_width(app, inner.width.max(1));
-    let help_height = help_lines.len() as u16; // 1+ lines depending on width
+    // Clamp help height so the task list keeps at least 1 row visible
+    let mut help_height = help_lines.len() as u16; // 1+ lines depending on width
+    let max_help = inner.height.saturating_sub(2); // tabs(1) + list(>=1)
+    if max_help > 0 {
+        help_height = help_height.min(max_help);
+    }
+    help_height = help_height.max(1);
 
     // Split inner area: tabs on top, task list, help block at bottom (if space).
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
@@ -58,9 +64,34 @@ pub fn draw(f: &mut Frame, app: &App) {
         let para = Paragraph::new(line);
         f.render_widget(para, chunks[1]);
     } else {
-        let lines = format_task_lines(app).join("\n");
-        let para = Paragraph::new(lines);
-        f.render_widget(para, chunks[1]);
+        if app.in_input_mode() {
+            // In input/command modes, render plain paragraph without row highlight
+            let lines = format_task_lines(app).join("\n");
+            let para = Paragraph::new(lines);
+            f.render_widget(para, chunks[1]);
+        } else {
+            // Normal list rendering with selected-row background highlight
+            let content_lines = format_task_lines(app);
+            let mut styled: Vec<Line> = content_lines.into_iter().map(Line::from).collect();
+            let cur_len = match app.view() {
+                View::Past => app.history_tasks().len(),
+                View::Today => app.day.tasks.len(),
+                View::Future => app.tomorrow_tasks().len(),
+            };
+            if cur_len > 0 {
+                let idx = app.selected_index().min(styled.len().saturating_sub(1));
+                if let Some(line) = styled.get_mut(idx) {
+                    // Apply background to the whole line; also set each span's bg to be safe.
+                    let blue_bg = Style::default().bg(Color::Blue);
+                    line.style = blue_bg;
+                    for span in line.spans.iter_mut() {
+                        span.style = span.style.patch(blue_bg);
+                    }
+                }
+            }
+            let para = Paragraph::new(styled);
+            f.render_widget(para, chunks[1]);
+        }
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -84,7 +115,13 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
 
     // Keep layout consistent with `draw`: tabs, content, help block
     let help_lines = help_lines_for_width(app, inner.width.max(1));
-    let help_height = help_lines.len() as u16;
+    // Clamp help height so the task list keeps at least 1 row visible
+    let mut help_height = help_lines.len() as u16;
+    let max_help = inner.height.saturating_sub(2);
+    if max_help > 0 {
+        help_height = help_height.min(max_help);
+    }
+    help_height = help_height.max(1);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
