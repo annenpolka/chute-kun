@@ -10,7 +10,7 @@ fn help_line_includes_primary_keys() {
     // task lifecycle
     assert!(s.contains("Enter"));
     assert!(s.contains("Shift+Enter"));
-    assert!(s.contains("Space"));
+    assert!(s.contains("start/pause"));
     // task operations
     assert!(s.contains("i: interrupt"));
     assert!(s.contains("p: postpone"));

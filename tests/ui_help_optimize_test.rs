@@ -9,7 +9,7 @@ fn today_help_includes_task_actions() {
     // task lifecycle present
     assert!(s.contains("Enter"));
     assert!(s.contains("Shift+Enter"));
-    assert!(s.contains("Space"));
+    assert!(s.contains("start/pause"));
     assert!(s.contains("i: interrupt"));
     assert!(s.contains("e: +5m"));
     assert!(s.contains("p: postpone"));
@@ -25,7 +25,7 @@ fn future_and_past_help_hide_task_actions() {
     app.handle_key(KeyCode::Tab);
     let s = format_help_line_for(&app);
     assert!(!s.contains("Shift+Enter"));
-    assert!(!s.contains("Space: pause"));
+    assert!(!s.contains("start/pause"));
     assert!(!s.contains("p: postpone"));
     assert!(s.contains("Tab"));
     assert!(s.contains("q: quit"));
@@ -35,7 +35,7 @@ fn future_and_past_help_hide_task_actions() {
     app.handle_key(KeyCode::BackTab);
     let s = format_help_line_for(&app);
     assert!(!s.contains("Shift+Enter"));
-    assert!(!s.contains("Space: pause"));
+    assert!(!s.contains("start/pause"));
     assert!(!s.contains("p: postpone"));
     assert!(s.contains("Tab"));
     assert!(s.contains("q: quit"));

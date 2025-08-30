@@ -201,7 +201,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/resume | Shift+Enter: finish | Space: pause | i: interrupt | p: postpone | [: up | ]: down | e: +5m";
+        "Enter: start/pause (toggle) | Shift+Enter: finish | i: interrupt | p: postpone | [: up | ]: down | e: +5m";
     format!("{} | {}", nav, task)
 }
 
