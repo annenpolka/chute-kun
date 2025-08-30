@@ -9,7 +9,7 @@ use crossterm::event::{
 use crossterm::{cursor, event, execute, terminal};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use chute_kun::config::Config;
+use chute_kun::config::{self, Config};
 use chute_kun::storage;
 use chute_kun::{app::App, ui};
 
@@ -47,49 +47,7 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<std::io::Stdout>>) -
 
 // ---- Helpers for CLI-only features ----
 
-fn parse_hhmm(s: &str) -> Result<(u8, u8), String> {
-    let mut it = s.split(':');
-    let h = it
-        .next()
-        .ok_or_else(|| "invalid time format, expected HH:MM".to_string())?
-        .parse::<u8>()
-        .map_err(|_| "invalid hour".to_string())?;
-    let m = it
-        .next()
-        .ok_or_else(|| "invalid time format, expected HH:MM".to_string())?
-        .parse::<u8>()
-        .map_err(|_| "invalid minute".to_string())?;
-    if it.next().is_some() {
-        return Err("invalid time format, expected HH:MM".to_string());
-    }
-    if h > 23 || m > 59 {
-        return Err("time out of range".to_string());
-    }
-    Ok((h, m))
-}
-
-fn set_day_start_in_toml(contents: &str, hhmm: &str) -> String {
-    let mut replaced = false;
-    let mut out = String::with_capacity(contents.len() + 32);
-    for line in contents.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("day_start") {
-            // Replace the whole line regardless of spacing/comments
-            out.push_str(&format!("day_start = \"{}\"\n", hhmm));
-            replaced = true;
-        } else {
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    if !replaced {
-        let mut inserted = String::new();
-        inserted.push_str(&format!("day_start = \"{}\"\n", hhmm));
-        inserted.push_str(&out);
-        return inserted;
-    }
-    out
-}
+// shared helpers moved to chute_kun::config
 
 fn main() -> Result<()> {
     color_eyre::install().ok();
@@ -107,7 +65,7 @@ fn main() -> Result<()> {
     }
 
     // Optional: set day_start value and exit (persistent).
-    // Usage: --set-day-start HH:MM
+    // Usage: --set-day-start HH:MM | HHMM
     // This updates the `day_start = "HH:MM"` line in the config TOML,
     // creating the config file if it does not exist.
     {
@@ -118,15 +76,10 @@ fn main() -> Result<()> {
                     eprintln!("--set-day-start requires a value like HH:MM");
                     std::process::exit(2);
                 };
-                // Validate and normalize value
-                let (hh, mm) = parse_hhmm(&val).map_err(|e| anyhow::anyhow!(e))?;
+                // Validate and normalize value (accept HH:MM or compact HHMM)
+                let (hh, mm) = config::parse_hhmm_or_compact(&val)?;
                 let normalized = format!("{:02}:{:02}", hh, mm);
-
-                let path = Config::write_default_file()?; // ensure file exists / resolve path
-                let contents =
-                    std::fs::read_to_string(&path).unwrap_or_else(|_| Config::default_toml());
-                let updated = set_day_start_in_toml(&contents, &normalized);
-                std::fs::write(&path, updated)?;
+                let path = config::write_day_start(hh, mm)?;
                 println!("updated day_start to {} at {}", normalized, path.display());
                 return Ok(());
             }

@@ -368,3 +368,68 @@ pub fn default_config_path() -> Option<PathBuf> {
     // Fallback to OS default (Linux uses ~/.config; Windows gets %APPDATA%)
     dirs::config_dir().map(|b| b.join("chute_kun").join("config.toml"))
 }
+
+// ---- Helpers for updating day_start persistently and parsing flexible inputs ----
+
+/// Update or insert the `day_start = "HH:MM"` line in a TOML string.
+pub fn set_day_start_in_toml(contents: &str, hhmm: &str) -> String {
+    let mut replaced = false;
+    let mut out = String::with_capacity(contents.len() + 32);
+    for line in contents.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("day_start") {
+            out.push_str(&format!("day_start = \"{}\"\n", hhmm));
+            replaced = true;
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if !replaced {
+        let mut inserted = String::new();
+        inserted.push_str(&format!("day_start = \"{}\"\n", hhmm));
+        inserted.push_str(&out);
+        return inserted;
+    }
+    out
+}
+
+/// Parse time in "HH:MM" or compact "HHMM" (3-4 digits) to (hour, minute).
+pub fn parse_hhmm_or_compact(s: &str) -> Result<(u16, u16)> {
+    let s = s.trim();
+    if let Some(colon) = s.find(':') {
+        // Standard HH:MM
+        let h: u16 = s[..colon].parse().context("invalid hour")?;
+        let m: u16 = s[colon + 1..].parse().context("invalid minute")?;
+        if h > 23 || m > 59 {
+            return Err(anyhow!("time out of range"));
+        }
+        return Ok((h, m));
+    }
+    // Compact HHMM (3-4 digits). Last two are minutes.
+    if s.chars().all(|c| c.is_ascii_digit()) && (s.len() == 3 || s.len() == 4) {
+        let (h_str, m_str) = s.split_at(s.len() - 2);
+        let h: u16 = h_str.parse().context("invalid hour")?;
+        let m: u16 = m_str.parse().context("invalid minute")?;
+        if h > 23 || m > 59 {
+            return Err(anyhow!("time out of range"));
+        }
+        return Ok((h, m));
+    }
+    Err(anyhow!("invalid time format, expected HH:MM or HHMM"))
+}
+
+/// Ensure a config file exists (respecting `CHUTE_KUN_CONFIG`/default path),
+/// update its `day_start` to the provided hour/minute, and write it back.
+/// Returns the path written.
+pub fn write_day_start(h: u16, m: u16) -> Result<PathBuf> {
+    if h > 23 || m > 59 {
+        return Err(anyhow!("time out of range"));
+    }
+    let path = Config::write_default_file()?;
+    let normalized = format!("{:02}:{:02}", h, m);
+    let contents = std::fs::read_to_string(&path).unwrap_or_else(|_| Config::default_toml());
+    let updated = set_day_start_in_toml(&contents, &normalized);
+    std::fs::write(&path, updated).context("write updated day_start to config")?;
+    Ok(path)
+}
