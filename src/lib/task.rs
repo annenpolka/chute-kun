@@ -13,12 +13,21 @@ pub struct Task {
     pub title: String,
     pub estimate_min: u16,
     pub actual_min: u16,
+    /// Partially accumulated seconds (<60) toward `actual_min` for this task.
+    #[serde(default)]
+    pub actual_carry_sec: u16,
     pub state: TaskState,
 }
 
 impl Task {
     pub fn new(title: &str, estimate_min: u16) -> Self {
-        Self { title: title.to_string(), estimate_min, actual_min: 0, state: TaskState::Planned }
+        Self {
+            title: title.to_string(),
+            estimate_min,
+            actual_min: 0,
+            actual_carry_sec: 0,
+            state: TaskState::Planned,
+        }
     }
 }
 

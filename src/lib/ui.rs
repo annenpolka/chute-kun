@@ -120,7 +120,7 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
     if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
-    let active_idx = app.day.active_index();
+    // active index not needed for seconds rendering anymore (per-task seconds)
 
     // Build schedule start times from `now_min`, adding remaining durations of preceding tasks.
     let mut cursor = now_min;
@@ -143,7 +143,10 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
         .enumerate()
         .map(|(i, t)| {
             let sel = if i == app.selected_index() { "▶" } else { " " };
-            let secs = if active_idx == Some(i) { app.active_carry_seconds() } else { 0 };
+            let secs = match t.state {
+                TaskState::Active | TaskState::Paused => t.actual_carry_sec,
+                _ => 0,
+            };
             let hh = (starts[i] / 60) % 24;
             let mm = starts[i] % 60;
             format!(
@@ -178,14 +181,13 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
 
     let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
     let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
-    // Show partial seconds not only while active, but also while paused.
-    // This avoids "truncating" seconds from the header when the user pauses.
-    let has_paused = app.day.tasks.iter().any(|t| matches!(t.state, TaskState::Paused));
-    let carry_sec: u32 = if app.day.active_index().is_some() || has_paused {
-        app.active_carry_seconds() as u32
-    } else {
-        0
-    };
+    // 正攻法: 全タスクの部分秒を合算
+    let carry_sec: u32 = app
+        .day
+        .tasks
+        .iter()
+        .map(|t| t.actual_carry_sec as u32)
+        .sum();
 
     let total_act_sec = total_act_min * 60 + carry_sec;
     let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
