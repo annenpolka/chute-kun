@@ -41,6 +41,13 @@ cargo test
 
 ```
 chute_kun --init-config
+chute_kun --set-day-start HH:MM   # 予定の基準時刻を変更（config.toml を更新）
+```
+
+TUI から変更（永続化）:
+
+```
+起動中に `:` を押してコマンドパレット → `base HH:MM` または `base HHMM` → Enter（`config.toml` に保存）
 ```
 
 生成場所やキー設定の詳細は `docs/setup/configuration.md` を参照。

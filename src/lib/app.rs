@@ -863,34 +863,48 @@ impl App {
     }
 
     fn apply_command(&mut self, cmd: &str) {
-        // Supported: "est +15m", "est -5", "est 90m"
+        // Supported:
+        // - "est +15m" / "est -5" / "est 90m" (estimate edit)
+        // - "base HH:MM" (予定の基準時刻 = day_start を変更)
         let mut it = cmd.split_whitespace();
         let Some(head) = it.next() else {
             return;
         };
-        if head != "est" {
-            return;
-        }
-        let Some(arg) = it.next() else {
-            return;
-        };
-        let s = arg.trim();
-        if s.starts_with('+') || s.starts_with('-') {
-            // relative delta
-            let sign = if s.starts_with('+') { 1 } else { -1 };
-            let num_part = s[1..].trim_end_matches('m');
-            if let Ok(v) = num_part.parse::<i16>() {
-                let delta = v.saturating_mul(sign);
-                self.day.adjust_estimate(self.selected, delta);
-            }
-        } else {
-            // absolute minutes
-            let num_part = s.trim_end_matches('m');
-            if let Ok(v) = num_part.parse::<u16>() {
-                if let Some(t) = self.day.tasks.get_mut(self.selected) {
-                    t.estimate_min = v;
+        match head {
+            "est" => {
+                let Some(arg) = it.next() else {
+                    return;
+                };
+                let s = arg.trim();
+                if s.starts_with('+') || s.starts_with('-') {
+                    // relative delta
+                    let sign = if s.starts_with('+') { 1 } else { -1 };
+                    let num_part = s[1..].trim_end_matches('m');
+                    if let Ok(v) = num_part.parse::<i16>() {
+                        let delta = v.saturating_mul(sign);
+                        self.day.adjust_estimate(self.selected, delta);
+                    }
+                } else {
+                    // absolute minutes
+                    let num_part = s.trim_end_matches('m');
+                    if let Ok(v) = num_part.parse::<u16>() {
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            t.estimate_min = v;
+                        }
+                    }
                 }
             }
+            "base" => {
+                if let Some(arg) = it.next() {
+                    if let Ok((h, m)) = crate::config::parse_hhmm_or_compact(arg) {
+                        // Update in-memory immediately
+                        self.config.day_start_minutes = h * 60 + m;
+                        // Persist by default
+                        let _ = crate::config::write_day_start(h, m);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

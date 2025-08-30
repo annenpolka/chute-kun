@@ -9,7 +9,7 @@ use crossterm::event::{
 use crossterm::{cursor, event, execute, terminal};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use chute_kun::config::Config;
+use chute_kun::config::{self, Config};
 use chute_kun::storage;
 use chute_kun::{app::App, ui};
 
@@ -45,6 +45,10 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<std::io::Stdout>>) -
     Ok(())
 }
 
+// ---- Helpers for CLI-only features ----
+
+// shared helpers moved to chute_kun::config
+
 fn main() -> Result<()> {
     color_eyre::install().ok();
     tracing_subscriber::fmt()
@@ -58,6 +62,28 @@ fn main() -> Result<()> {
         let path = Config::write_default_file()?;
         println!("wrote config to {}", path.display());
         return Ok(());
+    }
+
+    // Optional: set day_start value and exit (persistent).
+    // Usage: --set-day-start HH:MM | HHMM
+    // This updates the `day_start = "HH:MM"` line in the config TOML,
+    // creating the config file if it does not exist.
+    {
+        let mut args = std::env::args().skip(1);
+        while let Some(a) = args.next() {
+            if a == "--set-day-start" {
+                let Some(val) = args.next() else {
+                    eprintln!("--set-day-start requires a value like HH:MM");
+                    std::process::exit(2);
+                };
+                // Validate and normalize value (accept HH:MM or compact HHMM)
+                let (hh, mm) = config::parse_hhmm_or_compact(&val)?;
+                let normalized = format!("{:02}:{:02}", hh, mm);
+                let path = config::write_day_start(hh, mm)?;
+                println!("updated day_start to {} at {}", normalized, path.display());
+                return Ok(());
+            }
+        }
     }
 
     // Optional state path override: --state <path>

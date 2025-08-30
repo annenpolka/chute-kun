@@ -37,7 +37,14 @@ select_down = ["Down", "j"]
 
 **使い方**
 - 初期化: `chute_kun --init-config`（または `CHUTE_KUN_CONFIG=/path/to/config.toml chute_kun --init-config`）。
+- 変更（予定基準時間）: `chute_kun --set-day-start HH:MM` または `chute_kun --set-day-start HHMM`
+  - `CHUTE_KUN_CONFIG` が設定されていればそのパスを、なければ既定の config.toml を作成/更新します。
 - 実行時: ファイルが存在すれば自動読み込み。存在しない場合はデフォルト（09:00 と既定キー）。
+
+**TUI での変更（コマンドパレット）**
+- `:` でコマンドパレットを開き、`base HH:MM` または `base HHMM` を入力して Enter。
+  - 例: `base 10:30` / `base 1030`
+  - 変更は `config.toml` にも保存され、次回起動以降も有効です。
 
 **注意**
 - 入力モード中の文字入力はテキスト編集が優先され、カスタムキーは適用されません（Enter/Esc/Backspace/文字）。
