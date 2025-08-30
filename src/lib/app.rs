@@ -37,7 +37,6 @@ pub struct App {
     tomorrow: Vec<Task>,
     history: Vec<Task>,
     view: View,
-    active_accum_sec: u16,
     input: Option<Input>,
     pub config: Config,
     last_seen_ymd: u32,
@@ -68,7 +67,6 @@ impl App {
             tomorrow: vec![],
             history: vec![],
             view: View::default(),
-            active_accum_sec: 0,
             input: None,
             config,
             last_seen_ymd: ymd,
@@ -351,9 +349,6 @@ impl App {
         self.view
     }
 
-    pub fn active_carry_seconds(&self) -> u16 {
-        self.active_accum_sec
-    }
 
     // Input mode helpers for UI/tests
     pub fn in_input_mode(&self) -> bool {
@@ -390,10 +385,10 @@ impl App {
             self.sweep_done_before(today);
         }
         if let Some(active) = self.day.active_index() {
-            self.active_accum_sec = self.active_accum_sec.saturating_add(seconds);
-            while self.active_accum_sec >= 60 {
-                self.active_accum_sec -= 60;
-                if let Some(t) = self.day.tasks.get_mut(active) {
+            if let Some(t) = self.day.tasks.get_mut(active) {
+                t.actual_carry_sec = t.actual_carry_sec.saturating_add(seconds);
+                while t.actual_carry_sec >= 60 {
+                    t.actual_carry_sec -= 60;
                     t.actual_min = t.actual_min.saturating_add(1);
                 }
             }
@@ -409,7 +404,6 @@ impl App {
         self.tomorrow = future;
         self.history = past;
         self.selected = 0;
-        self.active_accum_sec = 0;
         self.set_view(View::Today);
         // Ensure old done items are moved to Past on startup
         self.sweep_done_before(self.last_seen_ymd);
