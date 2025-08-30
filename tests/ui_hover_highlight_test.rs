@@ -18,26 +18,25 @@ fn hover_row_renders_in_cyan_while_selection_stays_blue() {
     app.handle_mouse_move(col_x, row_y, area);
     assert_eq!(app.hovered_index(), Some(1), "hovered index should be 1 after mouse move");
 
-    // Draw and assert: row 0 (selected) is Blue; row 1 (hover) is Cyan
-    use ratatui::style::Color;
+    // Draw and assert: row 0 (selected) has selected highlight BG; row 1 (hover) has hover BG
     terminal.draw(|f| ui::draw(f, &app)).unwrap();
     let buf = terminal.backend().buffer();
     let list_y_top = list.y; // table header at list.y; first data row at list.y + 1
-                             // Selected row (index 0) should have Blue background somewhere across the row
+                             // Selected row (index 0) should have background somewhere across the row
     let mut blue_found = false;
     for x in list.x..list.x + list.width.min(buf.area.width) {
-        if buf[(x, list_y_top + 1)].style().bg == Some(Color::Blue) {
+        if buf[(x, list_y_top + 1)].style().bg == Some(ui::SELECTED_ROW_BG) {
             blue_found = true;
             break;
         }
     }
-    assert!(blue_found, "selected row should be Blue across at least one cell");
+    assert!(blue_found, "selected row should use SELECTED_ROW_BG across at least one cell");
 
     // Hover row (index 1) should have Cyan background somewhere across the row
     let mut cyan_found = false;
     for x in list.x..list.x + list.width.min(buf.area.width) {
         let cell = &buf[(x, list_y_top + 2)];
-        if cell.style().bg == Some(Color::Cyan) {
+        if cell.style().bg == Some(ui::HOVER_ROW_BG) {
             cyan_found = true;
             break;
         }
@@ -49,16 +48,16 @@ fn hover_row_renders_in_cyan_while_selection_stays_blue() {
         for x in 0..buf.area.width {
             row_chars.push_str(buf[(x, list_y_top + 2)].symbol());
             row_styles.push_str(match buf[(x, list_y_top + 2)].style().bg {
-                Some(Color::Blue) => "B",
-                Some(Color::Cyan) => "C",
+                Some(c) if c == ui::SELECTED_ROW_BG => "B",
+                Some(c) if c == ui::HOVER_ROW_BG => "C",
                 Some(_) => "*",
                 None => ".",
             });
         }
         panic!(
-            "hover row not Cyan. chars='{}' styles='{}' list=({},{},{},{})",
+            "hover row not HOVER_ROW_BG. chars='{}' styles='{}' list=({},{},{},{})",
             row_chars, row_styles, list.x, list.y, list.width, list.height
         );
     }
-    assert!(cyan_found, "hover row should be Cyan across at least one cell");
+    assert!(cyan_found, "hover row should use HOVER_ROW_BG across at least one cell");
 }
