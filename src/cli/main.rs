@@ -14,11 +14,14 @@ fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
     // Enter alternate screen + hide cursor first
     execute!(stdout(), terminal::EnterAlternateScreen, cursor::Hide)?;
-    // Try to enable progressive keyboard enhancement so modifiers like Shift+Enter are reported
+    // Try to enable progressive keyboard enhancement so modifiers like Shift+Enter are reported.
+    // NOTE: Avoid REPORT_ALL_KEYS_AS_ESCAPE_CODES because crossterm cannot yet decode
+    // Unicode code points for CSI-u mode, which breaks IME (e.g., Japanese) input.
+    // Keeping DISAMBIGUATE_ESCAPE_CODES + REPORT_EVENT_TYPES is enough for most
+    // modifier reporting without regressing non-ASCII text input.
     if terminal::supports_keyboard_enhancement().unwrap_or(false) {
         let flags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-            | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-            | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES;
+            | KeyboardEnhancementFlags::REPORT_EVENT_TYPES;
         let _ = execute!(stdout(), PushKeyboardEnhancementFlags(flags));
     }
     let backend = CrosstermBackend::new(stdout());
@@ -93,8 +96,10 @@ fn main() -> Result<()> {
             carry_millis -= 1000;
         }
         if event::poll(Duration::from_millis(100))? {
-            if let event::Event::Key(k) = event::read()? {
-                app.handle_key_event(k)
+            match event::read()? {
+                event::Event::Key(k) => app.handle_key_event(k),
+                event::Event::Paste(s) => app.handle_paste(&s),
+                _ => {}
             }
         }
         if app.should_quit {
