@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "husky: running pre-push tests"
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "error: cargo not found. Install Rust toolchain first (rustup)." >&2
+  exit 1
+fi
+
+if [ "${SKIP_CARGO_TEST:-0}" = "1" ]; then
+  echo "husky: SKIP_CARGO_TEST=1 -> skipping tests"
+  exit 0
+fi
+
+# Run workspace tests before push
+cargo test --workspace --all-features --all-targets
+
+echo "husky: pre-push tests passed"
+

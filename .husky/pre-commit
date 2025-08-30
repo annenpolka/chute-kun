@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "husky: running pre-commit (fmt-check + clippy)"
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "error: cargo not found. Install Rust toolchain first (rustup)." >&2
+  exit 1
+fi
+
+# Fast checks before commit
+cargo fmt-check
+cargo lint
+
+echo "husky: pre-commit checks passed"
+

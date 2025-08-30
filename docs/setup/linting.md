@@ -22,16 +22,20 @@
 - `rustfmt.toml` は安定版のオプションのみを使用しています。
 - 強めのルールを導入したい場合は、PRで議論のうえ `clippy.toml`/crate attributes の追加を検討してください。
 
-## pre-commit（任意だが推奨）
-- `.pre-commit-config.yaml` を用意しています。インストール後に有効化してください。
+## Git Hooks（Husky 推奨）
+- デフォルトのフックは Husky 形式（`.husky/` ディレクトリ）です。
+  - 有効化（クローン直後に1回）: `git config core.hooksPath .husky`
+  - `pre-commit`: `cargo fmt-check` と `cargo lint` を実行します。
+  - `pre-push`: `cargo test --workspace --all-features --all-targets` を実行します。
+    - テストを一時的にスキップ: `SKIP_CARGO_TEST=1 git push`
+
+## 代替: pre-commit ツール
+- 既存の `.pre-commit-config.yaml` も利用できます（任意）。
   - インストール: `pipx install pre-commit` または `pip install pre-commit`
   - 有効化: `pre-commit install`
-  - 動作: commit 前に以下を実行します
-    - `cargo fmt --all -- --check`
-    - `cargo lint`（= `cargo clippy --workspace --all-targets --all-features -- -D warnings`）
-    - `cargo test --workspace --all-targets --all-features`（環境変数`SKIP_CARGO_TEST=1`でスキップ可）
+  - 動作は上記 Husky と同等（fmt/clippy、任意で test）です。
 
-## Git hooks（pre-commit代替）
-- pre-commit ツールを使わない場合は `.githooks/pre-commit` を利用できます。
+## 代替: 素の Git hooks
+- ツールを使わない場合は `.githooks/pre-commit` を利用できます。
   - 有効化: `git config core.hooksPath .githooks`
   - テストのスキップ: `SKIP_CARGO_TEST=1 git commit ...`
