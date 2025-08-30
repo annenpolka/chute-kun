@@ -26,9 +26,8 @@ fn parse_ymd_override(s: &str) -> Option<u32> {
         NaiveDate::from_ymd_opt(y, m, d)?;
         return Some(ymd_to_u32(y, m, d));
     }
-    if let Some((y, m, d)) = s
-        .split_once('-')
-        .and_then(|(y, rest)| rest.split_once('-').map(|(m, d)| (y, m, d)))
+    if let Some((y, m, d)) =
+        s.split_once('-').and_then(|(y, rest)| rest.split_once('-').map(|(m, d)| (y, m, d)))
     {
         let y: i32 = y.parse().ok()?;
         let m: u32 = m.parse().ok()?;

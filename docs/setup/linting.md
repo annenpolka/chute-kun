@@ -22,3 +22,16 @@
 - `rustfmt.toml` は安定版のオプションのみを使用しています。
 - 強めのルールを導入したい場合は、PRで議論のうえ `clippy.toml`/crate attributes の追加を検討してください。
 
+## pre-commit（任意だが推奨）
+- `.pre-commit-config.yaml` を用意しています。インストール後に有効化してください。
+  - インストール: `pipx install pre-commit` または `pip install pre-commit`
+  - 有効化: `pre-commit install`
+  - 動作: commit 前に以下を実行します
+    - `cargo fmt --all -- --check`
+    - `cargo lint`（= `cargo clippy --workspace --all-targets --all-features -- -D warnings`）
+    - `cargo test --workspace --all-targets --all-features`（環境変数`SKIP_CARGO_TEST=1`でスキップ可）
+
+## Git hooks（pre-commit代替）
+- pre-commit ツールを使わない場合は `.githooks/pre-commit` を利用できます。
+  - 有効化: `git config core.hooksPath .githooks`
+  - テストのスキップ: `SKIP_CARGO_TEST=1 git commit ...`
