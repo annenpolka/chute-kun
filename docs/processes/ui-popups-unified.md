@@ -1,0 +1,40 @@
+title: UI Popups Unification
+
+# UI Popups Unification
+
+Status: Adopted (2025-08-31)
+
+Overview
+- The main task list/table always remains visible. All interactive flows use centered popup overlays.
+- Aims: zero context switches, predictable input model, consistent mouse/keyboard affordances.
+
+In-Scope Popups
+- Title Input (New/Interrupt): OK/Cancel. Enter confirms, Esc cancels.
+- New-Task Estimate (Slider): Add/Cancel. Arrow keys/j/k adjust ±5m; slider is clickable/drag‑gable.
+- Estimate Edit (Slider): OK/Cancel. Same adjustment semantics as above.
+- Command Palette: Run/Cancel. Input is typed while the popup is open; Enter or Run executes; Esc or Cancel closes without running.
+- Delete Confirmation: Delete/Cancel. While open, header (Act seconds) is frozen.
+
+Keyboard Semantics
+- Enter: confirm (OK/Add/Run/Delete). Esc: cancel.
+- Estimate adjustment: ←/→/j/k ±5m.
+- New task defaults: Normal 25m, Interrupt 15m when estimate is not typed.
+
+Mouse Semantics
+- Buttons: hover highlight; left click to activate. Slider tracks accept click/drag to set minutes.
+- Tabs, list selection, and other interactions remain available when no popup is open.
+
+Rendering Rules
+- Popups are centered and sized to content; buttons are horizontally centered within the inner box.
+- The main content (task table or empty hint) does not change while popups are shown.
+
+Tests (authoritative examples)
+- Command popup mouse E2E: `tests/app_command_popup_mouse_buttons_test.rs`.
+- Delete popup mouse E2E: `tests/app_delete_popup_mouse_buttons_test.rs`.
+- Estimate editor/new-task estimate: `tests/ui_estimate_stepper_test.rs`, `tests/app_new_task_estimate_drag_test.rs`.
+- Main list stays during delete confirm: `tests/ui_delete_prompt_test.rs`.
+
+Related Modules
+- `src/lib/ui.rs`: popup geometry helpers and overlay renderers.
+- `src/lib/app.rs`: input state, key/mouse handling while popups are open.
+
