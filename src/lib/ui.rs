@@ -55,7 +55,8 @@ pub fn draw(f: &mut Frame, app: &App) {
     // If we have an active banner, render it right below tabs
     let mut content_idx = 1usize; // index into chunks for main content
     if let Some(line) = active_banner {
-        let para = Paragraph::new(line);
+        // Underline the entire banner line for visibility
+        let para = Paragraph::new(line.patch_style(Modifier::UNDERLINED));
         f.render_widget(para, chunks[1]);
         content_idx = 2;
     }
@@ -364,7 +365,7 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     // Optional banner under tabs
     let mut content_idx = 1usize;
     if let Some(line) = active_banner {
-        let para = Paragraph::new(line);
+        let para = Paragraph::new(line.patch_style(Modifier::UNDERLINED));
         f.render_widget(para, chunks[1]);
         content_idx = 2;
     }
@@ -814,6 +815,7 @@ pub fn format_active_banner(app: &App) -> Option<Line<'static>> {
     line.spans.push(Span::raw(" "));
     line.spans.push(state_icon_span(t.state));
     line.spans.push(Span::raw(" "));
+    // Running task title (no underline here; banner is underlined as a whole)
     line.spans.push(Span::styled(t.title.clone(), Style::default().fg(Color::Cyan)));
     line.spans.push(Span::raw(format!(
         " (est:{}m act:{}m {}s)",
