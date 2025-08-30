@@ -47,7 +47,7 @@ impl Default for KeyMap {
             add_task: vec![k("i")],
             add_interrupt: vec![k("I")],
             start_or_resume: vec![k("Enter")],
-            finish_active: vec![k("Shift+Enter")],
+            finish_active: vec![k("Shift+Enter"), k("f")],
             pause: vec![k("Space")],
             reorder_up: vec![k("[")],
             reorder_down: vec![k("]")],
@@ -284,7 +284,7 @@ quit = "q"
 add_task = "i"
 add_interrupt = "I"
 start_or_resume = "Enter"
-finish_active = "Shift+Enter"
+finish_active = ["Shift+Enter", "f"]
 pause = "Space"
 reorder_up = "["
 reorder_down = "]"
