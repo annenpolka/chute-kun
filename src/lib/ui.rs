@@ -61,64 +61,20 @@ pub fn draw(f: &mut Frame, app: &App) {
         content_idx = 2;
     }
 
-    // Main content: if in estimate edit, render a styled line with highlighted minutes
-    if app.is_estimate_editing() {
-        let est = app.selected_estimate().unwrap_or(0);
-        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-        let mut line = Line::default();
-        line.spans.push(Span::raw("Estimate: "));
-        line.spans.push(Span::styled(
-            format!("{}m", est),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ));
-        if !title.is_empty() {
-            line.spans.push(Span::raw(" — "));
-            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
-        }
-        line.spans.push(Span::raw("  (←/→ or j/k to adjust; click slider; Enter=OK Esc=Cancel)"));
-        let para = Paragraph::new(line);
-        f.render_widget(para, chunks[content_idx]);
-    } else if app.is_new_task_estimate() {
-        // Show a single-line prompt for slider-based estimate input
-        let mut line = Line::default();
-        let est = app
-            .input_buffer()
-            .and_then(|s| s.parse::<u16>().ok())
-            .or_else(|| app.new_task_default_estimate())
-            .unwrap_or(25);
-        line.spans.push(Span::raw("Estimate: "));
-        line.spans.push(Span::styled(
-            format!("{}m", est),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ));
-        if let Some(title) = app.new_task_title() {
-            line.spans.push(Span::raw(" — "));
-            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
-        }
-        line.spans
-            .push(Span::raw("  (←/→ or j/k to adjust; click/drag slider; Enter=OK Esc=Cancel)"));
-        let para = Paragraph::new(line);
-        f.render_widget(para, chunks[content_idx]);
-    } else if app.in_input_mode() {
-        // In input/command modes, render plain paragraph without row highlight
-        let lines = format_task_lines(app).join("\n");
-        let para = Paragraph::new(lines);
+    // Main content: always keep task list/table; popups render as overlays
+    // Table-based rendering: columns on the left for planned and actual logs
+    let now = app_display_base(app);
+    let tasks_slice: Vec<crate::task::Task> = match app.view() {
+        View::Past => app.history_tasks().clone(),
+        View::Today => app.day.tasks.clone(),
+        View::Future => app.tomorrow_tasks().clone(),
+    };
+    if tasks_slice.is_empty() {
+        let para = Paragraph::new("No tasks — press 'i' to add");
         f.render_widget(para, chunks[content_idx]);
     } else {
-        // Table-based rendering: columns on the left for planned and actual logs
-        let now = app_display_base(app);
-        let tasks_slice: Vec<crate::task::Task> = match app.view() {
-            View::Past => app.history_tasks().clone(),
-            View::Today => app.day.tasks.clone(),
-            View::Future => app.tomorrow_tasks().clone(),
-        };
-        if tasks_slice.is_empty() {
-            let para = Paragraph::new("No tasks — press 'i' to add");
-            f.render_widget(para, chunks[content_idx]);
-        } else {
-            let table = build_task_table(now, app, &tasks_slice);
-            f.render_widget(table, chunks[content_idx]);
-        }
+        let table = build_task_table(now, app, &tasks_slice);
+        f.render_widget(table, chunks[content_idx]);
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -210,6 +166,49 @@ pub fn draw(f: &mut Frame, app: &App) {
             };
         spans.push(Span::styled("OK".to_string(), add_style));
         let gap = cancel.x.saturating_sub(add.x + add.width) as usize;
+        if gap > 0 {
+            spans.push(Span::raw(" ".repeat(gap)));
+        }
+        let cancel_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::InputCancel)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Cancel".to_string(), cancel_style));
+        let btn_rect = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
+    }
+
+    // Overlay: command palette popup (two buttons Run/Cancel)
+    if let Some(popup) = compute_command_popup_rect(app, area) {
+        let border = Style::default().fg(Color::Magenta);
+        let title_line = Line::from(Span::styled(" Command ", border.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner = block.inner(popup);
+        let buf = app.input_buffer().unwrap_or("");
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+        let msg = format!("Command: {} _{}", buf, suffix);
+        let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Span::styled(msg, border)), msg_rect);
+        let (run, cancel) = command_popup_button_hitboxes(app, popup);
+        let btn_y = run.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad = (run.x.saturating_sub(inner.x)) as usize;
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        let run_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::InputAdd)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Blue).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Run".to_string(), run_style));
+        let gap = cancel.x.saturating_sub(run.x + run.width) as usize;
         if gap > 0 {
             spans.push(Span::raw(" ".repeat(gap)));
         }
@@ -439,32 +438,7 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
 
 // Deterministic variant for tests: inject current minutes since midnight.
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
-    // Show specialized prompts only for relevant modes. For delete confirmation
-    // we keep main content unchanged and render a popup overlay in `draw`.
-    if app.is_estimate_editing() {
-        let est = app.selected_estimate().unwrap_or(0);
-        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-        return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
-    }
-    // Command palette prompt (+ show target task title)
-    if app.is_command_mode() {
-        let buf = app.input_buffer().unwrap_or("");
-        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-        return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
-    }
-    if app.is_new_task_estimate() {
-        let buf = app.input_buffer().unwrap_or("");
-        let title = app.new_task_title().unwrap_or("");
-        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-        return vec![format!("Estimate (min): {} _{}  (Enter=OK Esc=Cancel)", buf, suffix)];
-    }
-    // Input mode (Normal/Interrupt) prompt only when not in delete confirm
-    if app.in_input_mode() && !app.is_confirm_delete() {
-        let buf = app.input_buffer().unwrap_or("");
-        return vec![format!("Input: {} _  (Enter=OK Esc=Cancel)", buf)];
-    }
+    // For estimate edit/new-task estimate/title input/delete confirm, keep main list lines
     match app.view() {
         View::Past => render_list_slice(now_min, app, app.history_tasks()),
         View::Today => render_list_slice(now_min, app, &app.day.tasks),
@@ -1003,6 +977,27 @@ pub fn compute_new_task_estimate_popup_rect(app: &App, area: Rect) -> Option<Rec
     Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
 }
 
+// Command popup geometry (single-line prompt + buttons)
+pub fn compute_command_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_command_mode() {
+        return None;
+    }
+    let inner = Block::default().borders(Borders::ALL).inner(area);
+    if inner.width < 10 || inner.height < 3 {
+        return None;
+    }
+    let buf = app.input_buffer().unwrap_or("");
+    let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+    let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+    let content = format!("Command: {} _{}", buf, suffix);
+    let content_w = content.width() as u16;
+    let popup_w = content_w.saturating_add(4).min(inner.width).max(30).min(inner.width);
+    let popup_h: u16 = 4; // message + buttons
+    let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+    let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+    Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
 pub fn input_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
     let inner = Rect {
         x: popup.x + 1,
@@ -1019,6 +1014,23 @@ pub fn input_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
     let add = Rect { x: start_x, y, width: add_w, height: 1 };
     let cancel = Rect { x: start_x + add_w + 2, y, width: ca_w, height: 1 };
     (add, cancel)
+}
+
+pub fn command_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
+    let inner = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
+    let y = inner.y + inner.height.saturating_sub(1);
+    let run_w = UnicodeWidthStr::width("Run") as u16;
+    let ca_w = UnicodeWidthStr::width("Cancel") as u16;
+    let total = run_w + 2 + ca_w;
+    let start_x = inner.x + (inner.width.saturating_sub(total)) / 2;
+    let run = Rect { x: start_x, y, width: run_w, height: 1 };
+    let cancel = Rect { x: start_x + run_w + 2, y, width: ca_w, height: 1 };
+    (run, cancel)
 }
 
 // note: helpers that parsed message text for positions were removed in favor of

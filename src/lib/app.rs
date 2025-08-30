@@ -170,6 +170,31 @@ impl App {
                     _ => {}
                 }
             }
+        } else if self.is_command_mode() {
+            if let Some(popup) = crate::ui::compute_command_popup_rect(self, area) {
+                let (run, cancel) = crate::ui::command_popup_button_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        self.popup_hover = if point_in_rect(pos.0, pos.1, run) {
+                            Some(PopupButton::InputAdd)
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            Some(PopupButton::InputCancel)
+                        } else {
+                            None
+                        };
+                    }
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        if point_in_rect(pos.0, pos.1, run) {
+                            self.handle_key(KeyCode::Enter);
+                        } else if point_in_rect(pos.0, pos.1, cancel) {
+                            self.input = None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
         } else if self.in_input_mode() && !self.is_command_mode() {
             // Task name input (Normal/Interrupt)
             if let Some(popup) = crate::ui::compute_input_popup_rect(self, area) {
