@@ -23,10 +23,11 @@ fn act_column_shows_seconds_for_active_task() {
     terminal.draw(|f| ui::draw_with_clock(f, &app, &clock)).unwrap();
 
     let buf = terminal.backend().buffer().clone();
-    // 1行目の描画に "0m 5s" が含まれ、Actual(--:--) より左にある（= 第3カラム）
+    // 1つ目のデータ行に "0m 5s" が含まれ、Actual(--:--) より左にある（= 第3カラム）
+    // アクティブバナー表示時はデータ行は y=4 になる（0:枠,1:タブ,2:バナー,3:ヘッダ,4:1行目）。
     let mut row1 = String::new();
     for x in 0..buf.area.width {
-        row1.push_str(buf[(x, 3)].symbol());
+        row1.push_str(buf[(x, 4)].symbol());
     }
     let act_i = row1.find("0m 5s").expect("act seconds present");
     let actual_i = row1.find("--:--").expect("actual placeholder present");

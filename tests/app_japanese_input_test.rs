@@ -14,7 +14,9 @@ fn input_accepts_japanese_chars() {
     assert!(app.in_input_mode());
     assert_eq!(app.input_buffer(), Some("日本語"));
 
-    // Commit with Enter
+    // First Enter: move to estimate input; second Enter: finalize
+    app.handle_key(KeyCode::Enter);
+    assert!(app.in_input_mode());
     app.handle_key(KeyCode::Enter);
     assert!(!app.in_input_mode());
     assert_eq!(app.day.tasks.len(), 1);

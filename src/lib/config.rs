@@ -286,6 +286,13 @@ impl Config {
     }
 
     pub fn load() -> Self {
+        // In tests (integration/unit), avoid reading external user config for determinism.
+        // Detect by env var set by Rust test harness.
+        if std::env::var("RUST_TEST_THREADS").is_ok()
+            || std::env::var("CHUTE_KUN_DISABLE_CONFIG").is_ok()
+        {
+            return Config::default();
+        }
         if let Ok(path) = std::env::var("CHUTE_KUN_CONFIG") {
             if let Ok(s) = fs::read_to_string(&path) {
                 if let Ok(cfg) = Self::from_toml_str(&s) {
