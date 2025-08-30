@@ -32,18 +32,22 @@ TaskChuteの実装にあたり、コード品質の確保、要件の明確化�
    - チームメンバーがTDDに慣れるまでの学習コスト
    - テスト実装に関する追加作業
 
-## 実装方針
-1. Kent Beckの「Test-Driven Development: By Example」のプラクティスを参考にする
-2. 3ステップの基本サイクルを徹底する:
+## 実装方針（本リポジトリ）
+1. Kent Beck の「Test-Driven Development: By Example」のプラクティスを参考にする
+2. 3 ステップの基本サイクルを徹底する:
    - Red: 失敗するテストを書く
-   - Green: テストが通るようにシンプルなコードを書く
-   - Refactor: コードをリファクタリングする（テストは常に通る状態を維持）
-3. テストフレームワークとしてJestを採用する
-4. モックとスタブを活用し、外部依存性を持つコードもテスト可能にする
-5. ペアプログラミングを活用してTDDのプラクティスを強化する
+   - Green: テストが通るように最小のコードを書く
+   - Refactor: 設計を改善する（テストは常に Green）
+3. Rust の標準ツールチェーンで実行する
+   - 単体/統合テスト: `cargo test`
+   - UI 描画: `ratatui::backend::TestBackend` と `Buffer` 比較で検証
+   - 時刻依存: `clock::Clock` を注入し、決定的な値で検証
+4. 外部依存（将来の Todoist 等）は薄いラッパで抽象化し、モックでテストする
+5. 変更は「テスト + 実装 + ドキュメント」を同一コミットで更新する
 
 ## 関連
 - Kent Beck「Test-Driven Development: By Example」
 - Martin Fowler「Refactoring: Improving the Design of Existing Code」
-- docs/decisions/log.md (2025-03-01の決定項目)
-- docs/adr/ADR-001-TaskManagementAPI-Selection.md (Todoist APIとの統合点)
+- docs/processes/development-workflow.md
+- docs/processes/tui-architecture-and-naming.md
+- docs/adr/ADR-003-Rust-TUI-Library-Selection.md

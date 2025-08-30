@@ -1,7 +1,7 @@
 # ADR-001: Todoist API の選択
 
 ## ステータス
-提案
+提案（未採用・未実装）
 
 ## 日付
 2025-03-01
@@ -9,8 +9,8 @@
 ## コンテキスト
 タスクシュート手法を実装するためのバックエンドとして、既存のタスク管理APIを利用することでシンプルな構造と素早い開発を実現したい。選択肢としてTodoist、Microsoft To Do、Asana、その他のタスク管理APIが考えられる。
 
-## 決定
-Todoist REST API v2を主要なタスク管理バックエンドとして採用する。
+## 提案内容
+Todoist REST API v2 を主要なタスク管理バックエンドとして採用する案。
 
 ## 根拠
 1. Todoistはプロジェクト、セクション、タスク、コメント、ラベルなどタスクシュートの概念と親和性の高い構造を持つ
@@ -19,10 +19,10 @@ Todoist REST API v2を主要なタスク管理バックエンドとして採用�
 4. 複数のプログラミング言語（JavaScript、Python等）の公式クライアントライブラリが存在
 5. API使用制限が他のサービスと比較して寛容（開発中のテストにも適している）
 
-## 影響
-1. ユーザーはTodoistアカウントが必要となり、API Tokenの管理が発生する
-2. Todoistの構造に合わせてタスクシュートの概念をマッピングする必要がある
-3. 将来的にTodoist以外のバックエンドを追加する場合は、抽象化レイヤーの導入が必要となる
+## 影響（採用時）
+1. ユーザーは Todoist アカウントと API Token の管理が必要
+2. Todoist の構造に合わせた概念マッピングが必要
+3. 将来の他バックエンド追加には抽象化レイヤーが必要
 
 ## Todoist API 基本情報
 
@@ -52,6 +52,9 @@ Todoist REST API v2を主要なタスク管理バックエンドとして採用�
    - タスクシュートの「ログ」記録に活用可能
    - エンドポイント: `/comments`
 
+## 現状
+2025-08-30 時点ではローカルの TOML スナップショットのみ（外部 API 未実装）。進捗は `docs/setup/implementation-status.md` を参照。
+
 ## 関連
-- [Todoist Developer Documentation](https://developer.todoist.com/)
-- [Todoist REST API v2](https://developer.todoist.com/rest/v2/)
+- Todoist Developer Documentation: https://developer.todoist.com/
+- Todoist REST API v2: https://developer.todoist.com/rest/v2/
