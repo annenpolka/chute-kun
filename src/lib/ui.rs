@@ -5,12 +5,12 @@ use ratatui::{
 };
 
 use crate::app::{App, View};
-use crate::clock::{system_now_minutes, Clock};
+use crate::clock::Clock;
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.size();
-    let header = format_header_line(system_now_minutes(), app);
+    let header = format_header_line(app_display_base(app), app);
     let block = Block::default().title(header).borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -100,7 +100,7 @@ pub fn tab_titles(app: &App) -> (Vec<String>, usize) {
 }
 
 pub fn format_task_lines(app: &App) -> Vec<String> {
-    format_task_lines_at(system_now_minutes(), app)
+    format_task_lines_at(app_display_base(app), app)
 }
 
 // Deterministic variant for tests: inject current minutes since midnight.
@@ -214,3 +214,5 @@ pub fn format_help_line_for(app: &App) -> String {
         View::Past | View::Future => "q: quit | Tab: switch view".to_string(),
     }
 }
+
+fn app_display_base(app: &App) -> u16 { app.config.day_start_minutes }
