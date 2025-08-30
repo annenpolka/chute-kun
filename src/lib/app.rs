@@ -201,6 +201,21 @@ impl App {
         }
     }
 
+    /// Finish the currently selected task regardless of its active state.
+    pub fn finish_selected(&mut self) {
+        if self.day.tasks.is_empty() { return; }
+        let idx = self.selected.min(self.day.tasks.len() - 1);
+        self.day.finish_at(idx);
+        if let Some(task) = self.day.remove(idx) {
+            self.history.push(task);
+        }
+        if !self.day.tasks.is_empty() {
+            self.selected = self.selected.min(self.day.tasks.len() - 1);
+        } else {
+            self.selected = 0;
+        }
+    }
+
     fn apply_action(&mut self, action: crate::config::Action) {
         use crate::config::Action as A;
         match action {
@@ -237,7 +252,8 @@ impl App {
                 }
             }
             A::FinishActive => {
-                self.finish_active();
+                // Now defined as "finish selected"
+                self.finish_selected();
             }
             A::Pause => {
                 self.day.pause_active();

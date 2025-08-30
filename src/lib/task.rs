@@ -77,6 +77,17 @@ impl DayPlan {
         }
     }
 
+    /// Mark the task at `index` as Done.
+    /// - If it was the active task, clear active.
+    pub fn finish_at(&mut self, index: usize) {
+        if index >= self.tasks.len() { return; }
+        if self.active == Some(index) {
+            self.finish_active();
+        } else if let Some(t) = self.tasks.get_mut(index) {
+            t.state = TaskState::Done;
+        }
+    }
+
     pub fn add_actual_to_active(&mut self, minutes: u16) {
         if let Some(cur) = self.active {
             if let Some(t) = self.tasks.get_mut(cur) {
