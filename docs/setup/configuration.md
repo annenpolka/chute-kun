@@ -1,5 +1,5 @@
 **概要**
-- **場所**: `$XDG_CONFIG_HOME/chute_kun/config.toml`（未設定なら `~/.config/chute_kun/config.toml`）。`CHUTE_KUN_CONFIG` でパス上書き。
+- **場所**: `$XDG_CONFIG_HOME/chute_kun/config.toml`。未設定の場合、macOS/Linux では `~/.config/chute_kun/config.toml`（macOS も ~/Library ではなく ~/.config を使用）。`CHUTE_KUN_CONFIG` でパス上書き。
 - **目的**: 1日の開始時刻やキーバインドをユーザー側で調整。
 - **生成**: `chute_kun --init-config` で雛形を書き出し（既存ファイルは保持）。
 
@@ -13,7 +13,7 @@
 
 ```
 # Chute_kun configuration
-# 設定ファイルの場所: $XDG_CONFIG_HOME/chute_kン/config.toml （なければ ~/.config/chute_kun/config.toml）
+# 設定ファイルの場所: $XDG_CONFIG_HOME/chute_kun/config.toml （なければ ~/.config/chute_kun/config.toml）
 
 day_start = "09:00"
 

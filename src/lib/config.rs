@@ -316,8 +316,15 @@ select_down = ["Down", "j"]
 }
 
 pub fn default_config_path() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| dirs::config_dir());
-    base.map(|b| b.join("chute_kun").join("config.toml"))
+    if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
+        return Some(PathBuf::from(xdg).join("chute_kun").join("config.toml"));
+    }
+    // macOS: prefer ~/.config over ~/Library/Application Support to keep cross‑platform consistency
+    if cfg!(target_os = "macos") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return Some(PathBuf::from(home).join(".config").join("chute_kun").join("config.toml"));
+        }
+    }
+    // Fallback to OS default (Linux uses ~/.config; Windows gets %APPDATA%)
+    dirs::config_dir().map(|b| b.join("chute_kun").join("config.toml"))
 }
