@@ -154,6 +154,9 @@ impl App {
             KeyCode::Char('p') => {
                 self.postpone_selected();
             }
+            KeyCode::Char('b') => {
+                self.bring_selected_from_future();
+            }
             KeyCode::Tab => {
                 self.set_view(self.view.next());
             }
@@ -181,6 +184,14 @@ impl App {
         }
         // Fallback to legacy code-based handling to keep backward compatibility in tests
         self.handle_key(ev.code);
+    }
+
+    /// Handle pasted text from the terminal (bracketed/kitty paste etc.).
+    /// Appends to the input buffer only when in input mode.
+    pub fn handle_paste(&mut self, s: &str) {
+        if let Some(input) = self.input.as_mut() {
+            input.buffer.push_str(s);
+        }
     }
 
     pub fn add_task(&mut self, title: &str, estimate_min: u16) -> usize {
@@ -256,6 +267,9 @@ impl App {
             A::Postpone => {
                 self.postpone_selected();
             }
+            A::BringToToday => {
+                self.bring_selected_from_future();
+            }
             A::ViewNext => {
                 self.set_view(self.view.next());
             }
@@ -297,6 +311,24 @@ impl App {
         }
         if !self.day.tasks.is_empty() {
             self.selected = self.selected.min(self.day.tasks.len() - 1);
+        } else {
+            self.selected = 0;
+        }
+    }
+
+    /// Bring a task from Future to Today (mirror of postpone). No-op unless in Future view.
+    pub fn bring_selected_from_future(&mut self) {
+        if self.view != View::Future || self.tomorrow.is_empty() {
+            return;
+        }
+        let idx = self.selected.min(self.tomorrow.len() - 1);
+        let task = self.tomorrow.remove(idx);
+        // Ensure it becomes Planned in Today and append to the end.
+        let t = Task { state: crate::task::TaskState::Planned, ..task };
+        self.day.add_task(t);
+        // Adjust selection within Future list
+        if !self.tomorrow.is_empty() {
+            self.selected = self.selected.min(self.tomorrow.len() - 1);
         } else {
             self.selected = 0;
         }

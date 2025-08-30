@@ -219,8 +219,8 @@ pub fn format_help_line() -> String {
     // - quitting / navigation
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
-    // Include explicit "start/pause" for tests and clarity.
-    let task = "Enter: start/resume | Space: pause | Shift+Enter/f: finish | i: interrupt | p: postpone | [: up | ]: down | e: +5m (start/pause)";
+    let task =
+        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | b: bring | [: up | ]: down | e: +5m";
     format!("{} | {}", nav, task)
 }
 
@@ -230,7 +230,8 @@ pub fn format_help_line() -> String {
 pub fn format_help_line_for(app: &App) -> String {
     match app.view() {
         View::Today => format_help_line(),
-        View::Past | View::Future => "q: quit | Tab: switch view".to_string(),
+        View::Past => "q: quit | Tab: switch view".to_string(),
+        View::Future => "q: quit | Tab: switch view | b: bring".to_string(),
     }
 }
 
