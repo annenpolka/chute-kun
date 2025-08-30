@@ -438,10 +438,13 @@ impl App {
                         Some(2) => self.set_view(View::Future),
                         _ => {}
                     }
+                    // View change can shift list area (different banner/help height). Re-align hover
+                    let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                    self.update_hover_from_coords(ev.column, ev.row, list2);
                     return;
                 }
-                // List click
-                if ev.row < list.y || ev.row >= list.y.saturating_add(list.height) {
+                // List click (ignore header at list.y)
+                if ev.row <= list.y || ev.row >= list.y.saturating_add(list.height) {
                     return;
                 }
                 let idx = self.index_from_list_row(ev.row, list);
@@ -462,10 +465,14 @@ impl App {
                     self.last_click =
                         Some(LastClick { when: now, index: idx, button: MouseButton::Left });
                 }
+                // Starting/pausing can add/remove the active banner which shifts list Y by ±1.
+                // Recompute hover using the current coordinates against the new layout.
+                let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                self.update_hover_from_coords(ev.column, ev.row, list2);
             }
             MouseEventKind::Down(MouseButton::Right) => {
-                // Right click opens estimate editor on the clicked row
-                if ev.row < list.y || ev.row >= list.y.saturating_add(list.height) {
+                // Right click opens estimate editor on the clicked row (ignore header)
+                if ev.row <= list.y || ev.row >= list.y.saturating_add(list.height) {
                     return;
                 }
                 let idx = self.index_from_list_row(ev.row, list);
@@ -474,6 +481,9 @@ impl App {
                     self.input =
                         Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
+                // Popups don't affect list geometry, but realign hover defensively.
+                let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                self.update_hover_from_coords(ev.column, ev.row, list2);
             }
             _ => {}
         }
@@ -896,13 +906,16 @@ impl App {
     }
 
     fn index_from_list_row(&self, row: u16, list: Rect) -> usize {
-        let rel = row.saturating_sub(list.y) as usize;
+        // Table uses a header row at list.y; first data row starts at list.y + 1.
+        // Map mouse row to data index accordingly.
+        let rel = row.saturating_sub(list.y.saturating_add(1)) as usize;
         let len = self.current_len();
         rel.min(len.saturating_sub(1))
     }
 
     fn update_hover_from_coords(&mut self, col: u16, row: u16, list: Rect) {
-        if row >= list.y
+        // Only treat rows strictly below the header as list items
+        if row >= list.y.saturating_add(1)
             && row < list.y.saturating_add(list.height)
             && col >= list.x
             && col < list.x + list.width
