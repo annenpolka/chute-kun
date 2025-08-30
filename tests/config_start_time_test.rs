@@ -1,4 +1,5 @@
 use chute_kun::{app::App, ui};
+use serial_test::serial;
 use std::fs;
 use std::path::PathBuf;
 
@@ -8,6 +9,7 @@ fn write_test_config(dir: &PathBuf, contents: &str) {
 }
 
 #[test]
+#[serial]
 fn default_start_of_day_is_09_00_for_display() {
     // Without any config, display helpers should start at 09:00, not now.
     let mut app = App::new();
@@ -18,6 +20,7 @@ fn default_start_of_day_is_09_00_for_display() {
 }
 
 #[test]
+#[serial]
 fn start_of_day_can_be_overridden_by_config_toml() {
     // Point config dir to a temp path containing config.toml
     let tmp = tempfile::tempdir().unwrap();

@@ -1,6 +1,6 @@
 use crate::config;
 use crate::task::{DayPlan, Task};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum View {
@@ -117,8 +117,22 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, ev: KeyEvent) {
-        if ev.code == KeyCode::Enter && ev.modifiers.contains(KeyModifiers::SHIFT) {
+        let keys = config::load().keys;
+        if keys.finish.matches(&ev) {
             self.finish_active();
+            return;
+        }
+        if keys.start.matches(&ev) {
+            // Reuse Enter handling path for starting/resuming
+            self.handle_key(KeyCode::Enter);
+            return;
+        }
+        if keys.view_next.matches(&ev) {
+            self.set_view(self.view.next());
+            return;
+        }
+        if keys.view_prev.matches(&ev) {
+            self.set_view(self.view.prev());
             return;
         }
         self.handle_key(ev.code);

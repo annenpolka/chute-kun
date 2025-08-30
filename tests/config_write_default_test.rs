@@ -1,7 +1,9 @@
 use chute_kun::config;
+use serial_test::serial;
 use std::fs;
 
 #[test]
+#[serial]
 fn writes_default_config_when_missing() {
     let tmp = tempfile::tempdir().unwrap();
     let cfg_dir = tmp.path().join("chute_kun");
@@ -16,6 +18,7 @@ fn writes_default_config_when_missing() {
 }
 
 #[test]
+#[serial]
 fn does_not_overwrite_existing_config() {
     let tmp = tempfile::tempdir().unwrap();
     let cfg_dir = tmp.path().join("chute_kun");

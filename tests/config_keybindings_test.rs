@@ -1,8 +1,10 @@
 use chute_kun::app::App;
 use crossterm::event::KeyCode;
+use serial_test::serial;
 use std::fs;
 
 #[test]
+#[serial]
 fn quit_key_can_be_customized_via_config() {
     let tmp = tempfile::tempdir().unwrap();
     let cfg_dir = tmp.path().join("chute_kun");

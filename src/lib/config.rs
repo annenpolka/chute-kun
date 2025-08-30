@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::Deserialize;
 use std::{fs, path::PathBuf};
 
@@ -24,6 +25,10 @@ pub struct Keybindings {
     pub select_down: char,
     pub reorder_up: char,
     pub reorder_down: char,
+    pub start: Binding,
+    pub finish: Binding,
+    pub view_next: Binding,
+    pub view_prev: Binding,
 }
 
 impl Default for Keybindings {
@@ -38,6 +43,10 @@ impl Default for Keybindings {
             select_down: 'j',
             reorder_up: '[',
             reorder_down: ']',
+            start: Binding::Enter,
+            finish: Binding::ShiftEnter,
+            view_next: Binding::Tab,
+            view_prev: Binding::BackTab,
         }
     }
 }
@@ -61,6 +70,10 @@ struct RawKeybindings {
     select_down: Option<String>,
     reorder_up: Option<String>,
     reorder_down: Option<String>,
+    start: Option<String>,
+    finish: Option<String>,
+    view_next: Option<String>,
+    view_prev: Option<String>,
 }
 
 fn parse_hhmm_to_min(s: &str) -> Option<u16> {
@@ -82,6 +95,47 @@ fn parse_key_char(s: &str) -> Option<char> {
     match t.to_lowercase().as_str() {
         "space" | "spc" => Some(' '),
         _ => t.chars().next(),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Binding {
+    None,
+    Char(char),
+    Enter,
+    ShiftEnter,
+    Tab,
+    BackTab,
+}
+
+impl Binding {
+    pub fn matches(self, ev: &KeyEvent) -> bool {
+        match self {
+            Binding::None => false,
+            Binding::Char(c) => ev.code == KeyCode::Char(c) && ev.modifiers.is_empty(),
+            Binding::Enter => ev.code == KeyCode::Enter && ev.modifiers.is_empty(),
+            Binding::ShiftEnter => {
+                ev.code == KeyCode::Enter && ev.modifiers.contains(KeyModifiers::SHIFT)
+            }
+            Binding::Tab => ev.code == KeyCode::Tab,
+            Binding::BackTab => {
+                ev.code == KeyCode::BackTab
+                    || (ev.code == KeyCode::Tab && ev.modifiers.contains(KeyModifiers::SHIFT))
+            }
+        }
+    }
+}
+
+fn parse_binding(s: &str) -> Binding {
+    let t = s.trim();
+    let l = t.to_lowercase();
+    match l.as_str() {
+        "none" => Binding::None,
+        "enter" | "return" | "ret" => Binding::Enter,
+        "shift+enter" | "s-enter" | "shift-enter" => Binding::ShiftEnter,
+        "tab" => Binding::Tab,
+        "backtab" | "shift+tab" | "s-tab" | "shift-tab" => Binding::BackTab,
+        _ => parse_key_char(t).map(Binding::Char).unwrap_or(Binding::None),
     }
 }
 
@@ -139,6 +193,18 @@ pub fn load() -> Config {
                     }
                     if let Some(v) = k.reorder_down.and_then(|v| parse_key_char(&v)) {
                         keys.reorder_down = v;
+                    }
+                    if let Some(v) = k.start {
+                        keys.start = parse_binding(&v);
+                    }
+                    if let Some(v) = k.finish {
+                        keys.finish = parse_binding(&v);
+                    }
+                    if let Some(v) = k.view_next {
+                        keys.view_next = parse_binding(&v);
+                    }
+                    if let Some(v) = k.view_prev {
+                        keys.view_prev = parse_binding(&v);
                     }
                     cfg.keys = keys;
                 }

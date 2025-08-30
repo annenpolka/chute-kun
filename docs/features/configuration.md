@@ -14,7 +14,7 @@ If the file is missing, sensible defaults are used.
 
 ## Keys
 
-You can customize a subset of keybindings. Values are single characters; use `"space"` (or `"SPC"`) for the space key.
+You can customize keybindings. Values may be single characters (use `"space"` for space) or special names: `enter`, `shift+enter`, `tab`, `backtab`.
 
 ```toml
 # Default start-of-day used for schedule display and ESD baseline.
@@ -30,8 +30,13 @@ select_up = "k"     # move cursor up
 select_down = "j"   # move cursor down
 reorder_up = "["    # move selected up
 reorder_down = "]"  # move selected down
+# Special bindings (default shown)
+start = "enter"         # start/resume selected
+finish = "shift+enter"  # finish active (and move to History)
+view_next = "tab"       # switch view: Past -> Today -> Future
+view_prev = "backtab"   # switch view backwards (aka Shift+Tab)
 ```
 
 Notes:
-- Arrow keys, `Tab`/`Shift-Tab`, and `Enter`/`Shift+Enter` are currently fixed.
+- Arrow keys remain active regardless of custom `select_up`/`select_down`.
 - The application reads the config when handling input and rendering, so edits take effect on next redraw.
