@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Clear, Paragraph, Tabs, Wrap},
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Tabs, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -80,27 +80,20 @@ pub fn draw(f: &mut Frame, app: &App) {
         let para = Paragraph::new(lines);
         f.render_widget(para, chunks[content_idx]);
     } else {
-        // Normal list rendering with selected-row background highlight
-        let content_lines = format_task_lines(app);
-        let mut styled: Vec<Line> = content_lines.into_iter().map(Line::from).collect();
-        let cur_len = match app.view() {
-            View::Past => app.history_tasks().len(),
-            View::Today => app.day.tasks.len(),
-            View::Future => app.tomorrow_tasks().len(),
+        // Table-based rendering: columns on the left for planned and actual logs
+        let now = app_display_base(app);
+        let tasks_slice: Vec<crate::task::Task> = match app.view() {
+            View::Past => app.history_tasks().clone(),
+            View::Today => app.day.tasks.clone(),
+            View::Future => app.tomorrow_tasks().clone(),
         };
-        if cur_len > 0 {
-            let idx = app.selected_index().min(styled.len().saturating_sub(1));
-            if let Some(line) = styled.get_mut(idx) {
-                // Apply background to the whole line; also set each span's bg to be safe.
-                let blue_bg = Style::default().bg(Color::Blue);
-                line.style = blue_bg;
-                for span in line.spans.iter_mut() {
-                    span.style = span.style.patch(blue_bg);
-                }
-            }
+        if tasks_slice.is_empty() {
+            let para = Paragraph::new("No tasks — press 'i' to add");
+            f.render_widget(para, chunks[content_idx]);
+        } else {
+            let table = build_task_table(now, app, &tasks_slice);
+            f.render_widget(table, chunks[content_idx]);
         }
-        let para = Paragraph::new(styled);
-        f.render_widget(para, chunks[content_idx]);
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -182,23 +175,22 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         content_idx = 2;
     }
 
-    // Content with injected clock, using styled lines for selection highlight
-    let mut styled: Vec<Line> =
-        format_task_lines_at(now, app).into_iter().map(Line::from).collect();
-    let cur_len = match app.view() {
-        View::Past => app.history_tasks().len(),
-        View::Today => app.day.tasks.len(),
-        View::Future => app.tomorrow_tasks().len(),
+    // Content with injected clock: render as a table
+    let tasks_slice: Vec<crate::task::Task> = match app.view() {
+        View::Past => app.history_tasks().clone(),
+        View::Today => app.day.tasks.clone(),
+        View::Future => app.tomorrow_tasks().clone(),
     };
-    if cur_len > 0 {
-        let idx = app.selected_index().min(styled.len().saturating_sub(1));
-        if let Some(line) = styled.get_mut(idx) {
-            line.style = Style::default().bg(Color::Blue);
+    if tasks_slice.is_empty() {
+        let para = Paragraph::new("No tasks — press 'i' to add");
+        if chunks.len() > content_idx && chunks[content_idx].height > 0 {
+            f.render_widget(para, chunks[content_idx]);
         }
-    }
-    let para = Paragraph::new(styled);
-    if chunks.len() > content_idx && chunks[content_idx].height > 0 {
-        f.render_widget(para, chunks[content_idx]);
+    } else {
+        let table = build_task_table(now, app, &tasks_slice);
+        if chunks.len() > content_idx && chunks[content_idx].height > 0 {
+            f.render_widget(table, chunks[content_idx]);
+        }
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -312,7 +304,7 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
             };
             let hh = (starts[i] / 60) % 24;
             let mm = starts[i] % 60;
-            format!(
+            let planned = format!(
                 "{:02}:{:02} {} {} {} (est:{}m act:{}m {}s)",
                 hh,
                 mm,
@@ -322,9 +314,91 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
                 t.estimate_min,
                 t.actual_min,
                 secs
-            )
+            );
+            // Actual start/end column
+            let act_col = match (t.started_at_min, t.finished_at_min) {
+                (Some(s), Some(e)) => format!(
+                    "実測 {:02}:{:02}-{:02}:{:02}",
+                    (s / 60) % 24,
+                    s % 60,
+                    (e / 60) % 24,
+                    e % 60
+                ),
+                (Some(s), None) => {
+                    format!("実測 {:02}:{:02}-", (s / 60) % 24, s % 60)
+                }
+                _ => "実測 --:--".to_string(),
+            };
+            format!("{}  |  {}", planned, act_col)
         })
         .collect()
+}
+
+fn format_actual_last_finish_time(t: &crate::task::Task) -> String {
+    // Prefer the explicit finished_at_min if present (final finish)
+    if let Some(e) = t.finished_at_min {
+        return format!("{:02}:{:02}", (e / 60) % 24, e % 60);
+    }
+    // Otherwise, find the most recent session with an end time
+    if let Some(e) = t.sessions.iter().rev().find_map(|s| s.end_min) {
+        return format!("{:02}:{:02}", (e / 60) % 24, e % 60);
+    }
+    // No finished session yet
+    "--:--".to_string()
+}
+
+fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) -> Table<'static> {
+    // If empty, show the hint paragraph to save space
+    let mut rows: Vec<Row> = Vec::new();
+    // Build schedule start times similar to `render_list_slice`
+    let mut cursor = now_min;
+    let starts: Vec<u16> = tasks_slice
+        .iter()
+        .map(|t| {
+            let this = cursor;
+            let remaining = match t.state {
+                TaskState::Done => 0,
+                _ => t.estimate_min.saturating_sub(t.actual_min),
+            };
+            cursor = cursor.saturating_add(remaining);
+            this
+        })
+        .collect();
+
+    let selected = app.selected_index().min(tasks_slice.len().saturating_sub(1));
+    for (i, t) in tasks_slice.iter().enumerate() {
+        let hh = (starts[i] / 60) % 24;
+        let mm = starts[i] % 60;
+        let planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
+        let actual_cell = Cell::from(format_actual_last_finish_time(t));
+        let title_cell = Cell::from(format!(
+            "{} {} (est:{}m act:{}m {}s)",
+            state_icon(t.state),
+            t.title,
+            t.estimate_min,
+            t.actual_min,
+            if matches!(t.state, TaskState::Active | TaskState::Paused) {
+                t.actual_carry_sec
+            } else {
+                0
+            }
+        ));
+        let mut row = Row::new(vec![planned_cell, actual_cell, title_cell]);
+        if i == selected {
+            row = row.style(Style::default().bg(Color::Blue));
+        }
+        rows.push(row);
+    }
+
+    // Header
+    let header = Row::new(vec![Cell::from("Plan"), Cell::from("Actual"), Cell::from("Task")])
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+
+    // Column widths: planned is fixed 5, actual takes up to 22, title consumes the rest
+    let widths = [Constraint::Length(5), Constraint::Length(30), Constraint::Min(10)];
+
+    // Render table using a minimal block to avoid nested borders (outer block already drawn)
+    Table::new(rows, widths).header(header).column_spacing(1).block(Block::default())
 }
 
 fn state_icon(state: TaskState) -> &'static str {

@@ -33,14 +33,20 @@ fn help_should_render_at_bottom_when_active_banner_present() {
     let banner_line = line_at(&buf, 2);
     assert!(banner_line.contains("Now:"), "expected active banner on y=2, got: {}", banner_line);
 
-    // The first list content line should not be replaced by help
-    let list_top = line_at(&buf, 3);
+    // The first content rows should be a table header then task rows, not help
+    let header_row = line_at(&buf, 3);
     assert!(
-        list_top.contains("Focus Work") || list_top.contains("Email"),
-        "expected task content at y=3, got: {}",
-        list_top
+        header_row.contains("Plan") && header_row.contains("Actual"),
+        "expected table header at y=3, got: {}",
+        header_row
+    );
+    let list_first = line_at(&buf, 4);
+    assert!(
+        list_first.contains("Focus Work") || list_first.contains("Email"),
+        "expected task content at y=4, got: {}",
+        list_first
     );
 
-    // Sanity: ensure no help line leaked into the list top.
-    assert!(!list_top.contains("q: quit"), "help text should not overlap the list area");
+    // Sanity: ensure no help line leaked into the list area.
+    assert!(!list_first.contains("q: quit"), "help text should not overlap the list area");
 }

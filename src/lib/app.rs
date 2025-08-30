@@ -182,7 +182,12 @@ impl App {
             }
             KeyCode::Enter => {
                 // Toggle: if active -> pause; else start/resume selected or first eligible.
-                if self.day.active_index().is_some() {
+                if let Some(active_idx) = self.day.active_index() {
+                    // End the running session before pausing
+                    let now = crate::clock::system_now_minutes();
+                    if let Some(t) = self.day.tasks.get_mut(active_idx) {
+                        t.end_session(now);
+                    }
                     self.day.pause_active();
                 } else {
                     let s = self.selected;
@@ -192,6 +197,14 @@ impl App {
                     );
                     if eligible {
                         self.day.start(s);
+                        // Record actual start time if first activation
+                        if let Some(t) = self.day.tasks.get_mut(s) {
+                            if t.started_at_min.is_none() {
+                                t.started_at_min = Some(crate::clock::system_now_minutes());
+                            }
+                            let now = crate::clock::system_now_minutes();
+                            t.start_session(now);
+                        }
                     } else if let Some(idx) = (0..self.day.tasks.len()).find(|&i| {
                         matches!(
                             self.day.tasks[i].state,
@@ -200,6 +213,13 @@ impl App {
                     }) {
                         self.day.start(idx);
                         self.selected = idx;
+                        if let Some(t) = self.day.tasks.get_mut(idx) {
+                            if t.started_at_min.is_none() {
+                                t.started_at_min = Some(crate::clock::system_now_minutes());
+                            }
+                            let now = crate::clock::system_now_minutes();
+                            t.start_session(now);
+                        }
                     }
                 }
             }
@@ -283,6 +303,11 @@ impl App {
     pub fn finish_active(&mut self) {
         if let Some(idx) = self.day.active_index() {
             let ymd = self.last_seen_ymd;
+            let now = crate::clock::system_now_minutes();
+            if let Some(t) = self.day.tasks.get_mut(idx) {
+                t.finished_at_min = Some(now);
+                t.end_session(now);
+            }
             self.day.finish_at(idx, ymd);
         }
     }
@@ -294,6 +319,11 @@ impl App {
         }
         let idx = self.selected.min(self.day.tasks.len() - 1);
         let ymd = self.last_seen_ymd;
+        let now = crate::clock::system_now_minutes();
+        if let Some(t) = self.day.tasks.get_mut(idx) {
+            t.finished_at_min = Some(now);
+            t.end_session(now);
+        }
         self.day.finish_at(idx, ymd);
     }
 
@@ -311,7 +341,12 @@ impl App {
             }
             A::StartOrResume => {
                 // Toggle behavior for Enter-mapped action: pause if active, otherwise start/resume
-                if self.day.active_index().is_some() {
+                if let Some(active_idx) = self.day.active_index() {
+                    // End current session before pausing
+                    let now = crate::clock::system_now_minutes();
+                    if let Some(t) = self.day.tasks.get_mut(active_idx) {
+                        t.end_session(now);
+                    }
                     self.day.pause_active();
                 } else {
                     let s = self.selected;
@@ -321,6 +356,14 @@ impl App {
                     );
                     if eligible {
                         self.day.start(s);
+                        // Record actual start time if first activation and open a new session
+                        if let Some(t) = self.day.tasks.get_mut(s) {
+                            let now = crate::clock::system_now_minutes();
+                            if t.started_at_min.is_none() {
+                                t.started_at_min = Some(now);
+                            }
+                            t.start_session(now);
+                        }
                     } else if let Some(idx) = (0..self.day.tasks.len()).find(|&i| {
                         matches!(
                             self.day.tasks[i].state,
@@ -329,6 +372,13 @@ impl App {
                     }) {
                         self.day.start(idx);
                         self.selected = idx;
+                        if let Some(t) = self.day.tasks.get_mut(idx) {
+                            let now = crate::clock::system_now_minutes();
+                            if t.started_at_min.is_none() {
+                                t.started_at_min = Some(now);
+                            }
+                            t.start_session(now);
+                        }
                     }
                 }
             }
@@ -337,6 +387,12 @@ impl App {
                 self.finish_selected();
             }
             A::Pause => {
+                if let Some(idx) = self.day.active_index() {
+                    let now = crate::clock::system_now_minutes();
+                    if let Some(t) = self.day.tasks.get_mut(idx) {
+                        t.end_session(now);
+                    }
+                }
                 self.day.pause_active();
             }
             A::ReorderUp => {
