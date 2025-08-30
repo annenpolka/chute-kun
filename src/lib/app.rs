@@ -192,7 +192,10 @@ impl App {
                 self.selected = new;
             }
             KeyCode::Char('e') => {
-                self.day.adjust_estimate(self.selected, 5);
+                // Open estimate edit mode
+                if !self.day.tasks.is_empty() {
+                    self.input = Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                }
             }
             KeyCode::Char('p') => {
                 self.postpone_selected();
@@ -294,7 +297,10 @@ impl App {
                 self.selected = new;
             }
             A::EstimatePlus => {
-                self.day.adjust_estimate(self.selected, 5);
+                // Repurpose to open estimate editor for backward compatibility with config name
+                if !self.day.tasks.is_empty() {
+                    self.input = Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                }
             }
             A::Postpone => {
                 self.postpone_selected();

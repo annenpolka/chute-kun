@@ -8,7 +8,7 @@ fn estimate_stepper_opens_updates_and_confirms() {
     app.add_task("A", 20);
 
     // Enter estimate edit mode
-    app.handle_key(KeyCode::Char('E'));
+    app.handle_key(KeyCode::Char('e'));
     let lines = ui::format_task_lines(&app);
     assert!(lines.first().unwrap().starts_with("Estimate:"), "expected stepper line, got: {:?}", lines);
     assert!(lines.first().unwrap().contains("20m"));
@@ -27,4 +27,3 @@ fn estimate_stepper_opens_updates_and_confirms() {
     app.handle_key(KeyCode::Enter);
     assert!(!app.in_input_mode(), "should exit stepper on Enter");
 }
-

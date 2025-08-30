@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Gauge, Paragraph, Tabs},
+    widgets::{Block, Borders, Paragraph, Tabs},
 };
 
 use crate::app::{App, View};
@@ -31,46 +31,10 @@ pub fn draw(f: &mut Frame, app: &App) {
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
 
-    // Main content: input modes and normal list
-    // When in estimate edit mode, also render a gauge for quick visual feedback
-    if app.is_estimate_editing() {
-        let sub = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(0)])
-            .split(chunks[1]);
-        let est = app.selected_estimate().unwrap_or(0);
-        let max = 120u16; // visualize against 2h as a simple default
-        let pct: u16 = ((est as u32 * 100) / (max as u32)).min(100) as u16;
-        let title = app
-            .day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.title.as_str())
-            .unwrap_or("");
-        let gauge = Gauge::default()
-            .block(
-                Block::default()
-                    .title(if title.is_empty() {
-                        "Estimate".to_string()
-                    } else {
-                        format!("Estimate — {}", title)
-                    })
-                    .borders(Borders::ALL),
-            )
-            .gauge_style(Style::default().fg(Color::LightGreen))
-            .use_unicode(true)
-            .percent(pct)
-            .label(Span::raw(format!("Est {}m", est)));
-        f.render_widget(gauge, sub[0]);
-
-        let lines = format_task_lines(app).join("\n");
-        let para = Paragraph::new(lines);
-        f.render_widget(para, sub[1]);
-    } else {
-        let lines = format_task_lines(app).join("\n");
-        let para = Paragraph::new(lines);
-        f.render_widget(para, chunks[1]);
-    }
+    // Main content: use textual lines for all modes (stepper/command/show list)
+    let lines = format_task_lines(app).join("\n");
+    let para = Paragraph::new(lines);
+    f.render_widget(para, chunks[1]);
 
     // Help line at the bottom
     if chunks.len() >= 3 && chunks[2].height > 0 {
@@ -261,7 +225,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | [: up | ]: down | e: +5m";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | [: up | ]: down | e: edit est";
     format!("{} | {}", nav, task)
 }
 

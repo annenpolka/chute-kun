@@ -16,5 +16,5 @@ fn help_line_includes_primary_keys() {
     assert!(s.contains("p: postpone"));
     assert!(s.contains("[: up"));
     assert!(s.contains("]: down"));
-    assert!(s.contains("e: +5m"));
+    assert!(s.contains("e: edit"));
 }
