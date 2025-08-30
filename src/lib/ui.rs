@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Tabs, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Tabs, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -18,7 +18,13 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     // Pre-compute wrapped help lines for current width, to size the layout.
     let help_lines = help_lines_for_width(app, inner.width.max(1));
-    let help_height = help_lines.len() as u16; // 1+ lines depending on width
+    // Clamp help height so the task list keeps at least 1 row visible
+    let mut help_height = help_lines.len() as u16; // 1+ lines depending on width
+    let max_help = inner.height.saturating_sub(2); // tabs(1) + list(>=1)
+    if max_help > 0 {
+        help_height = help_height.min(max_help);
+    }
+    help_height = help_height.max(1);
 
     // Split inner area: tabs on top, task list, help block at bottom (if space).
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
@@ -58,9 +64,34 @@ pub fn draw(f: &mut Frame, app: &App) {
         let para = Paragraph::new(line);
         f.render_widget(para, chunks[1]);
     } else {
-        let lines = format_task_lines(app).join("\n");
-        let para = Paragraph::new(lines);
-        f.render_widget(para, chunks[1]);
+        if app.in_input_mode() {
+            // In input/command modes, render plain paragraph without row highlight
+            let lines = format_task_lines(app).join("\n");
+            let para = Paragraph::new(lines);
+            f.render_widget(para, chunks[1]);
+        } else {
+            // Normal list rendering with selected-row background highlight
+            let content_lines = format_task_lines(app);
+            let mut styled: Vec<Line> = content_lines.into_iter().map(Line::from).collect();
+            let cur_len = match app.view() {
+                View::Past => app.history_tasks().len(),
+                View::Today => app.day.tasks.len(),
+                View::Future => app.tomorrow_tasks().len(),
+            };
+            if cur_len > 0 {
+                let idx = app.selected_index().min(styled.len().saturating_sub(1));
+                if let Some(line) = styled.get_mut(idx) {
+                    // Apply background to the whole line; also set each span's bg to be safe.
+                    let blue_bg = Style::default().bg(Color::Blue);
+                    line.style = blue_bg;
+                    for span in line.spans.iter_mut() {
+                        span.style = span.style.patch(blue_bg);
+                    }
+                }
+            }
+            let para = Paragraph::new(styled);
+            f.render_widget(para, chunks[1]);
+        }
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -70,6 +101,33 @@ pub fn draw(f: &mut Frame, app: &App) {
             .style(Style::default().fg(Color::DarkGray))
             .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
+    }
+
+    // Overlay: centered delete confirmation popup with colored text
+    if app.is_confirm_delete() {
+        // Compute message and popup size within the inner area
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
+        let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+        let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
+        let popup_h: u16 = 3;
+        let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+        let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+        let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
+
+        let border_style = Style::default().fg(Color::Red);
+        let title = Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner_popup = block.inner(popup);
+        let para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
+        f.render_widget(para, inner_popup);
     }
 }
 
@@ -84,7 +142,13 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
 
     // Keep layout consistent with `draw`: tabs, content, help block
     let help_lines = help_lines_for_width(app, inner.width.max(1));
-    let help_height = help_lines.len() as u16;
+    // Clamp help height so the task list keeps at least 1 row visible
+    let mut help_height = help_lines.len() as u16;
+    let max_help = inner.height.saturating_sub(2);
+    if max_help > 0 {
+        help_height = help_height.min(max_help);
+    }
+    help_height = help_height.max(1);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -129,6 +193,32 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
             .wrap(Wrap { trim: true });
         f.render_widget(help, chunks[2]);
     }
+
+    // Overlay: centered delete confirmation popup with colored text
+    if app.is_confirm_delete() {
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let msg = format!("Delete? — {}  (Enter=Delete Esc=Cancel)", title);
+        let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+        let popup_w = content_w.saturating_add(4).min(inner.width).max(20).min(inner.width);
+        let popup_h: u16 = 3;
+        let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+        let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+        let popup = Rect { x: px, y: py, width: popup_w, height: popup_h };
+
+        let border_style = Style::default().fg(Color::Red);
+        let title = Line::from(Span::styled(" Confirm ", border_style.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title).border_style(border_style);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner_popup = block.inner(popup);
+        let para = Paragraph::new(Span::styled(msg, Style::default().fg(Color::Red)));
+        f.render_widget(para, inner_popup);
+    }
 }
 
 // Tab metadata for the date views (Past/Today/Future).
@@ -149,24 +239,37 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
 
 // Deterministic variant for tests: inject current minutes since midnight.
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
-    if app.in_input_mode() {
+    // Show specialized prompts only for relevant modes. For delete confirmation
+    // we keep main content unchanged and render a popup overlay in `draw`.
+    if app.is_estimate_editing() {
+        let est = app.selected_estimate().unwrap_or(0);
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+        return vec![format!(
+            "Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)",
+            est, suffix
+        )];
+    }
+    // Command palette prompt (+ show target task title)
+    if app.is_command_mode() {
         let buf = app.input_buffer().unwrap_or("");
-        // Estimate edit mode shows explicit stepper line with task title
-        if app.is_estimate_editing() {
-            let est = app.selected_estimate().unwrap_or(0);
-            let title =
-                app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
-        }
-        // Command palette prompt (+ show target task title)
-        if app.is_command_mode() {
-            let title =
-                app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
-        }
-        // Fallback: normal input mode for adding a task
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+        return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
+    }
+    // Input mode (Normal/Interrupt) prompt only when not in delete confirm
+    if app.in_input_mode() && !app.is_confirm_delete() {
+        let buf = app.input_buffer().unwrap_or("");
         return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
     }
     match app.view() {
@@ -264,7 +367,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | b: bring | [: up | ]: down | e: edit | j/k";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | x: delete | b: bring | [: up | ]: down | e: edit | j/k";
     format!("{} | {}", nav, task)
 }
 
@@ -289,6 +392,7 @@ pub fn help_items_for(app: &App) -> Vec<&'static str> {
             "Shift+Enter/f: finish",
             "i: interrupt",
             "p: postpone",
+            "x: delete",
             "[: up",
             "]: down",
             "e: edit",

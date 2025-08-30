@@ -48,6 +48,7 @@ enum InputKind {
     Interrupt,
     Command,
     EstimateEdit,
+    ConfirmDelete,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,6 +143,17 @@ impl App {
                     }
                     _ => {}
                 },
+                InputKind::ConfirmDelete => match code {
+                    // Confirm via Enter or 'y'; cancel via Esc or 'n'
+                    KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        self.delete_selected();
+                        self.input = None;
+                    }
+                    KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                        self.input = None;
+                    }
+                    _ => {}
+                },
             }
             return;
         }
@@ -211,6 +223,12 @@ impl App {
             }
             KeyCode::Char('p') => {
                 self.postpone_selected();
+            }
+            KeyCode::Char('x') => {
+                // Open delete confirmation on Today view with an existing task
+                if self.view == View::Today && !self.day.tasks.is_empty() {
+                    self.input = Some(Input { kind: InputKind::ConfirmDelete, buffer: String::new() });
+                }
             }
             KeyCode::Char('b') => {
                 self.bring_selected_from_future();
@@ -429,6 +447,9 @@ impl App {
     pub fn is_command_mode(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::Command))
     }
+    pub fn is_confirm_delete(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::ConfirmDelete))
+    }
     pub fn selected_estimate(&self) -> Option<u16> {
         self.day.tasks.get(self.selected).map(|t| t.estimate_min)
     }
@@ -453,6 +474,10 @@ impl App {
     }
 
     pub fn tick(&mut self, seconds: u16) {
+        // Freeze app time updates while a confirmation popup is open
+        if self.is_confirm_delete() {
+            return;
+        }
         // Sweep when the local date changes
         let today = today_ymd();
         if today != self.last_seen_ymd {
@@ -472,6 +497,19 @@ impl App {
 }
 
 impl App {
+    fn delete_selected(&mut self) {
+        if self.view != View::Today || self.day.tasks.is_empty() {
+            return;
+        }
+        let idx = self.selected.min(self.day.tasks.len() - 1);
+        let _ = self.day.remove(idx);
+        if !self.day.tasks.is_empty() {
+            self.selected = self.selected.min(self.day.tasks.len() - 1);
+        } else {
+            self.selected = 0;
+        }
+    }
+
     /// Replace task lists from an external snapshot.
     /// - Resets selection and carry seconds; keeps config.
     pub fn apply_snapshot(

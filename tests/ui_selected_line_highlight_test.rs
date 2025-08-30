@@ -1,10 +1,11 @@
 use chute_kun::{app::App, ui};
-use ratatui::{backend::TestBackend, Terminal};
+use ratatui::{backend::TestBackend, style::Color, Terminal};
 
 #[test]
 fn selected_line_has_background_highlight() {
     // Arrange a small terminal and an app with a couple of tasks
-    let backend = TestBackend::new(40, 8);
+    // Height is set so that list keeps at least 2 rows after help wraps
+    let backend = TestBackend::new(40, 10);
     let mut terminal = Terminal::new(backend).unwrap();
     let mut app = App::new();
     app.add_task("A", 10);
@@ -13,7 +14,7 @@ fn selected_line_has_background_highlight() {
     // Act: initial draw (selected index = 0)
     terminal.draw(|f| ui::draw(f, &app)).unwrap();
 
-    // Assert: the first list row (inside the bordered block) has a non-Reset BG
+    // Assert: the first list row (inside the bordered block) has Blue BG
     {
         let backend = terminal.backend();
         let buf = backend.buffer();
