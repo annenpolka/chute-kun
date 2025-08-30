@@ -2,6 +2,7 @@ use chute_kun::{app::App, config::Config, storage};
 
 fn build_sample_app() -> App {
     let mut app = App::new();
+    std::env::set_var("CHUTE_KUN_TODAY", "2025-08-30");
     // Today: A (will be Done -> Past), D (Planned -> Active)
     let _a = app.add_task("A", 30);
     let _b = app.add_task("B", 15);
@@ -9,10 +10,13 @@ fn build_sample_app() -> App {
     app.select_down(); // select B
     app.postpone_selected(); // B -> Future (Planned)
 
-    // Start and finish A so it moves to Past (history)
+    // Start and finish A (stays in Today as Done for the same day)
     // After postponing, only A remains at index 0
     app.day.start(0);
-    app.finish_active(); // A -> Done -> history
+    app.finish_active(); // A -> Done (Today)
+
+    // Simulate next day: sweep moves Done items to Past
+    app.sweep_done_before(20250831);
 
     // Add D and start it (Active in Today)
     let _d = app.add_task("D", 20);
@@ -71,4 +75,3 @@ fn toml_layout_is_git_friendly_and_ordered() {
     assert!(toml_str.contains("estimate_min = 20"));
     assert!(toml_str.contains("state = \"Active\""));
 }
-
