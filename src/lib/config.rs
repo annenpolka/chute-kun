@@ -32,6 +32,7 @@ pub struct KeyMap {
     pub reorder_down: Vec<KeySpec>,
     pub estimate_plus: Vec<KeySpec>,
     pub postpone: Vec<KeySpec>,
+    pub bring_to_today: Vec<KeySpec>,
     pub view_next: Vec<KeySpec>,
     pub view_prev: Vec<KeySpec>,
     pub select_up: Vec<KeySpec>,
@@ -53,6 +54,7 @@ impl Default for KeyMap {
             reorder_down: vec![k("]")],
             estimate_plus: vec![k("e")],
             postpone: vec![k("p")],
+            bring_to_today: vec![k("b")],
             view_next: vec![k("Tab")],
             view_prev: vec![k("BackTab")],
             select_up: vec![k("Up"), k("k")],
@@ -73,6 +75,7 @@ pub enum Action {
     ReorderDown,
     EstimatePlus,
     Postpone,
+    BringToToday,
     ViewNext,
     ViewPrev,
     SelectUp,
@@ -102,6 +105,8 @@ impl KeyMap {
             Some(Action::EstimatePlus)
         } else if matches(&self.postpone) {
             Some(Action::Postpone)
+        } else if matches(&self.bring_to_today) {
+            Some(Action::BringToToday)
         } else if matches(&self.view_next) {
             Some(Action::ViewNext)
         } else if matches(&self.view_prev) {
@@ -180,6 +185,7 @@ struct RawKeys {
     reorder_down: Option<OneOrMany>,
     estimate_plus: Option<OneOrMany>,
     postpone: Option<OneOrMany>,
+    bring_to_today: Option<OneOrMany>,
     view_next: Option<OneOrMany>,
     view_prev: Option<OneOrMany>,
     select_up: Option<OneOrMany>,
@@ -239,6 +245,7 @@ impl Config {
             if let Some(v) = keys.reorder_down { apply(&mut km.reorder_down, v)?; }
             if let Some(v) = keys.estimate_plus { apply(&mut km.estimate_plus, v)?; }
             if let Some(v) = keys.postpone { apply(&mut km.postpone, v)?; }
+            if let Some(v) = keys.bring_to_today { apply(&mut km.bring_to_today, v)?; }
             if let Some(v) = keys.view_next { apply(&mut km.view_next, v)?; }
             if let Some(v) = keys.view_prev { apply(&mut km.view_prev, v)?; }
             if let Some(v) = keys.select_up { apply(&mut km.select_up, v)?; }
@@ -290,6 +297,7 @@ reorder_up = "["
 reorder_down = "]"
 estimate_plus = "e"
 postpone = "p"
+bring_to_today = "b"
 view_next = "Tab"
 view_prev = "BackTab"
 select_up = ["Up", "k"]

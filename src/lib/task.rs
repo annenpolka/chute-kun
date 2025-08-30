@@ -17,6 +17,8 @@ pub struct Task {
     #[serde(default)]
     pub actual_carry_sec: u16,
     pub state: TaskState,
+    #[serde(default)]
+    pub done_ymd: Option<u32>,
 }
 
 impl Task {
@@ -78,11 +80,19 @@ impl DayPlan {
         }
     }
 
-    pub fn finish_active(&mut self) {
-        if let Some(cur) = self.active.take() {
-            if let Some(t) = self.tasks.get_mut(cur) {
+    /// Mark the task at `index` as Done with the given date (YYYYMMDD).
+    /// - If it was the active task, clear active.
+    pub fn finish_at(&mut self, index: usize, today_ymd: u32) {
+        if index >= self.tasks.len() { return; }
+        if self.active == Some(index) {
+            self.active = None;
+            if let Some(t) = self.tasks.get_mut(index) {
                 t.state = TaskState::Done;
+                t.done_ymd = Some(today_ymd);
             }
+        } else if let Some(t) = self.tasks.get_mut(index) {
+            t.state = TaskState::Done;
+            t.done_ymd = Some(today_ymd);
         }
     }
 
