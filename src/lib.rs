@@ -8,3 +8,5 @@ pub mod config;
 pub mod task;
 #[path = "lib/ui.rs"]
 pub mod ui;
+#[path = "lib/storage.rs"]
+pub mod storage;
