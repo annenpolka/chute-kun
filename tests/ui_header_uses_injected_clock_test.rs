@@ -28,7 +28,7 @@ fn header_contains_esd_and_totals_from_injected_local_minutes() {
     let width = buf.area.width as usize;
     let mut first_line = String::new();
     for x in 0..width as u16 {
-        let cell = buf.get(x, 0);
+        let cell = &buf[(x, 0)];
         first_line.push_str(cell.symbol());
     }
     // ESD 09:00 + (30+60)=90 => 10:30

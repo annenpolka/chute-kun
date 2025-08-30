@@ -10,7 +10,7 @@ use crate::clock::Clock;
 use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
-    let area: Rect = f.size();
+    let area: Rect = f.area();
     let header = format_header_line(app_display_base(app), app);
     let block = Block::default().title(header).borders(Borders::ALL);
     let inner = block.inner(area);
@@ -133,7 +133,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 
 /// Like `draw`, but uses an injected `Clock` for current time.
 pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
-    let area: Rect = f.size();
+    let area: Rect = f.area();
     let now = clock.now_minutes();
     let header = format_header_line(now, app);
     let block = Block::default().title(header).borders(Borders::ALL);
