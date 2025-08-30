@@ -118,7 +118,16 @@ impl DayPlan {
     }
 
     pub fn esd(&self, now_min: u16) -> u16 {
-        esd_from(now_min, &[self.remaining_total_min()])
+        // ESD should not couple with measured actuals; use full estimates of non-done tasks.
+        let est_sum: u16 = self
+            .tasks
+            .iter()
+            .map(|t| match t.state {
+                TaskState::Done => 0,
+                _ => t.estimate_min,
+            })
+            .sum();
+        esd_from(now_min, &[est_sum])
     }
 
     pub fn reorder_down(&mut self, index: usize) -> usize {
