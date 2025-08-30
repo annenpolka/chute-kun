@@ -202,35 +202,37 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
 
 // Deterministic variant for tests: inject current minutes since midnight.
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
-    if app.in_input_mode() {
+    // Show specialized prompts only for relevant modes. For delete confirmation
+    // we keep main content unchanged and render a popup overlay in `draw`.
+    if app.is_estimate_editing() {
+        let est = app.selected_estimate().unwrap_or(0);
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+        return vec![format!(
+            "Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)",
+            est, suffix
+        )];
+    }
+    // Command palette prompt (+ show target task title)
+    if app.is_command_mode() {
         let buf = app.input_buffer().unwrap_or("");
-        // Estimate edit mode shows explicit stepper line with task title
-        if app.is_estimate_editing() {
-            let est = app.selected_estimate().unwrap_or(0);
-            let title =
-                app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!("Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)", est, suffix)];
-        }
-        // Delete confirmation prompt
-        if app.is_confirm_delete() {
-            let title = app
-                .day
-                .tasks
-                .get(app.selected_index())
-                .map(|t| t.title.as_str())
-                .unwrap_or("");
-            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!("Delete?{}  (Enter=Delete Esc=Cancel)", suffix)];
-        }
-        // Command palette prompt (+ show target task title)
-        if app.is_command_mode() {
-            let title =
-                app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
-            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
-            return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
-        }
-        // Fallback: normal input mode for adding a task
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+        return vec![format!("Command: {} _{}  (Enter=Run Esc=Cancel)", buf, suffix)];
+    }
+    // Input mode (Normal/Interrupt) prompt only when not in delete confirm
+    if app.in_input_mode() && !app.is_confirm_delete() {
+        let buf = app.input_buffer().unwrap_or("");
         return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
     }
     match app.view() {

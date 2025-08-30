@@ -1,20 +1,22 @@
 use chute_kun::{app::App, ui};
 use crossterm::event::KeyCode;
 
-// Red: 削除確認中はプロンプト行が表示される（タイトルを含む）
+// 新仕様: 削除確認中でもメインリストは維持される（プロンプト行で置換しない）
 #[test]
-fn shows_delete_confirmation_prompt_line() {
+fn main_list_stays_while_confirm_delete() {
     let mut app = App::new();
     app.add_task("To Delete", 5);
 
-    // Trigger delete confirm
+    // Before confirm, first line should include the task title
+    let before = ui::format_task_lines(&app);
+    assert!(before[0].contains("To Delete"));
+
+    // Trigger delete confirm; underlying list should remain the same in formatting output
     app.handle_key(KeyCode::Char('x'));
-
-    // Use the same formatting helper used elsewhere to verify the prompt line text
-    let lines = ui::format_task_lines(&app);
-    let first = lines.first().unwrap().to_string();
-    assert!(first.contains("Delete"), "expected a delete confirmation line, got: {}", first);
-    assert!(first.contains("To Delete"), "should mention task title, got: {}", first);
-    assert!(first.contains("Enter=Delete"), "should show Enter=Delete hint, got: {}", first);
+    let during = ui::format_task_lines(&app);
+    assert!(during[0].contains("To Delete"), "list should remain while confirming");
+    assert!(
+        !during[0].contains("Delete?"),
+        "main content should not be replaced by delete prompt"
+    );
 }
-
