@@ -16,7 +16,7 @@ fn press_i_then_enter_creates_planned_normal_task_when_empty() {
 }
 
 #[test]
-fn press_I_does_not_pause_current_and_creates_planned_interrupt() {
+fn press_i_does_not_pause_current_and_creates_planned_interrupt() {
     let mut app = App::new();
     let a = app.add_task("A", 30);
     app.day.start(a);
@@ -32,7 +32,7 @@ fn press_I_does_not_pause_current_and_creates_planned_interrupt() {
 }
 
 #[test]
-fn press_I_creates_planned_interrupt_when_empty() {
+fn press_i_creates_planned_interrupt_when_empty() {
     let mut app = App::new();
     app.handle_key(KeyCode::Char('I'));
     app.handle_key(KeyCode::Enter);

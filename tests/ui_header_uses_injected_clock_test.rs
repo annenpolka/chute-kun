@@ -1,10 +1,12 @@
-use chute_kun::{app::App, ui};
 use chute_kun::clock::Clock;
+use chute_kun::{app::App, ui};
 use ratatui::{backend::TestBackend, Terminal};
 
 struct FixedClock(u16);
 impl Clock for FixedClock {
-    fn now_minutes(&self) -> u16 { self.0 }
+    fn now_minutes(&self) -> u16 {
+        self.0
+    }
 }
 
 #[test]
@@ -31,7 +33,14 @@ fn header_contains_esd_and_totals_from_injected_local_minutes() {
     }
     // ESD 09:00 + (30+60)=90 => 10:30
     assert!(first_line.contains("ESD 10:30"), "header should show ESD 10:30, got: {}", first_line);
-    assert!(first_line.contains("Est 90m 0s"), "header should include Est 90m 0s, got: {}", first_line);
-    assert!(first_line.contains("Act 0m 0s"), "header should include Act 0m 0s, got: {}", first_line);
+    assert!(
+        first_line.contains("Est 90m 0s"),
+        "header should include Est 90m 0s, got: {}",
+        first_line
+    );
+    assert!(
+        first_line.contains("Act 0m 0s"),
+        "header should include Act 0m 0s, got: {}",
+        first_line
+    );
 }
-

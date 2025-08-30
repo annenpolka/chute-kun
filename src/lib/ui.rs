@@ -41,6 +41,13 @@ pub fn draw(f: &mut Frame, app: &App) {
     let lines = content_lines.join("\n");
     let para = Paragraph::new(lines);
     f.render_widget(para, chunks[1]);
+
+    // Help line at the bottom
+    if chunks.len() >= 3 && chunks[2].height > 0 {
+        let help =
+            Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
+        f.render_widget(help, chunks[2]);
+    }
 }
 
 /// Like `draw`, but uses an injected `Clock` for current time.
@@ -52,9 +59,10 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
+    // Keep layout consistent with `draw`: tabs, content, help line
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
         .split(inner);
 
     let (titles, selected) = tab_titles(app);
@@ -73,7 +81,8 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
 
     // Help line at the bottom
     if chunks.len() >= 3 && chunks[2].height > 0 {
-        let help = Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
+        let help =
+            Paragraph::new(format_help_line_for(app)).style(Style::default().fg(Color::DarkGray));
         f.render_widget(help, chunks[2]);
     }
 }
@@ -184,3 +193,24 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
 }
 
 // Local time retrieval moved to `crate::clock`.
+
+/// Generic keyboard help string (superset). Used by tests and as fallback.
+pub fn format_help_line() -> String {
+    // Keep wording substrings aligned with tests
+    // - quitting / navigation
+    let nav = "q: quit | Tab: switch view";
+    // - task lifecycle and operations (Today view only in optimized variant)
+    let task =
+        "Enter: start/resume | Shift+Enter: finish | Space: pause | i: interrupt | p: postpone | [: up | ]: down | e: +5m";
+    format!("{} | {}", nav, task)
+}
+
+/// Optimized help depending on the current view.
+/// - Today: show full task actions
+/// - Past/Future: show only navigation and quit to reduce noise
+pub fn format_help_line_for(app: &App) -> String {
+    match app.view() {
+        View::Today => format_help_line(),
+        View::Past | View::Future => "q: quit | Tab: switch view".to_string(),
+    }
+}

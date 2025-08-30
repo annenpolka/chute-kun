@@ -19,7 +19,7 @@ fn i_enters_input_and_enter_adds_typed_title() {
 }
 
 #[test]
-fn I_enters_interrupt_input_and_uses_interrupt_defaults() {
+fn i_enters_interrupt_input_and_uses_interrupt_defaults() {
     let mut app = App::new();
     app.handle_key(KeyCode::Char('I'));
     app.handle_key(KeyCode::Char('U'));
@@ -57,4 +57,3 @@ fn backspace_edits_buffer_before_commit() {
     assert_eq!(app.day.tasks.len(), 1);
     assert_eq!(app.day.tasks[0].title, "A");
 }
-
