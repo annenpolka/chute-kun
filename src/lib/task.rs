@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Session {
+    pub start_min: u16,
+    #[serde(default)]
+    pub end_min: Option<u16>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskState {
     Planned,
     Active,
@@ -16,6 +23,18 @@ pub struct Task {
     /// Partially accumulated seconds (<60) toward `actual_min` for this task.
     #[serde(default)]
     pub actual_carry_sec: u16,
+    /// Actual first start time in minutes since local midnight.
+    /// Recorded when the task first transitions to Active.
+    #[serde(default)]
+    pub started_at_min: Option<u16>,
+    /// Actual finish time in minutes since local midnight.
+    /// Recorded when the task is marked Done.
+    #[serde(default)]
+    pub finished_at_min: Option<u16>,
+    /// Full session log for this task (start/end pairs). The last session
+    /// may have `end_min=None` while the task is Active.
+    #[serde(default)]
+    pub sessions: Vec<Session>,
     pub state: TaskState,
     #[serde(default)]
     pub done_ymd: Option<u32>,
@@ -28,8 +47,27 @@ impl Task {
             estimate_min,
             actual_min: 0,
             actual_carry_sec: 0,
+            started_at_min: None,
+            finished_at_min: None,
+            sessions: Vec::new(),
             state: TaskState::Planned,
             done_ymd: None,
+        }
+    }
+}
+
+impl Task {
+    pub fn start_session(&mut self, now_min: u16) {
+        let need_new = self.sessions.last().is_none_or(|s| s.end_min.is_some());
+        if need_new {
+            self.sessions.push(Session { start_min: now_min, end_min: None });
+        }
+    }
+    pub fn end_session(&mut self, now_min: u16) {
+        if let Some(last) = self.sessions.last_mut() {
+            if last.end_min.is_none() {
+                last.end_min = Some(now_min);
+            }
         }
     }
 }
@@ -118,7 +156,35 @@ impl DayPlan {
     }
 
     pub fn esd(&self, now_min: u16) -> u16 {
-        esd_from(now_min, &[self.remaining_total_min()])
+        // Sum estimates of non-done tasks (decoupled from progress)
+        let est_sum: u16 = self
+            .tasks
+            .iter()
+            .map(|t| match t.state {
+                TaskState::Done => 0,
+                _ => t.estimate_min,
+            })
+            .sum();
+        // Base time: latest measured finish (task finish or session end) or now, whichever is later
+        let base = match self.latest_actual_finish_min() {
+            Some(last) => last.max(now_min),
+            None => now_min,
+        };
+        esd_from(base, &[est_sum])
+    }
+
+    /// Latest actual finish minute across all tasks for today.
+    fn latest_actual_finish_min(&self) -> Option<u16> {
+        let mut max_end: Option<u16> = None;
+        for t in &self.tasks {
+            if let Some(f) = t.finished_at_min {
+                max_end = Some(max_end.map_or(f, |m| m.max(f)));
+            }
+            if let Some(e) = t.sessions.iter().filter_map(|s| s.end_min).max() {
+                max_end = Some(max_end.map_or(e, |m| m.max(e)));
+            }
+        }
+        max_end
     }
 
     pub fn reorder_down(&mut self, index: usize) -> usize {
