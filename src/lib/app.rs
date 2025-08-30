@@ -183,6 +183,14 @@ impl App {
         self.handle_key(ev.code);
     }
 
+    /// Handle pasted text from the terminal (bracketed/kitty paste etc.).
+    /// Appends to the input buffer only when in input mode.
+    pub fn handle_paste(&mut self, s: &str) {
+        if let Some(input) = self.input.as_mut() {
+            input.buffer.push_str(s);
+        }
+    }
+
     pub fn add_task(&mut self, title: &str, estimate_min: u16) -> usize {
         self.day.add_task(Task::new(title, estimate_min))
     }
