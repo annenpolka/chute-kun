@@ -16,14 +16,49 @@ fn hover_row_renders_in_cyan_while_selection_stays_blue() {
     let row_y = list.y + 1; // index 1
     let col_x = list.x + 2;
     app.handle_mouse_move(col_x, row_y, area);
+    assert_eq!(app.hovered_index(), Some(1), "hovered index should be 1 after mouse move");
 
     // Draw and assert: row 0 (selected) is Blue; row 1 (hover) is Cyan
     use ratatui::style::Color;
     terminal.draw(|f| ui::draw(f, &app)).unwrap();
     let buf = terminal.backend().buffer();
-    let list_y_top = 2u16; // tabs at y=1, list at y=2
-    let sel_cell = &buf[(1, list_y_top)];
-    let hover_cell = &buf[(1, list_y_top + 1)];
-    assert_eq!(sel_cell.style().bg, Some(Color::Blue), "selected should be Blue");
-    assert_eq!(hover_cell.style().bg, Some(Color::Cyan), "hover should be Cyan");
+    let list_y_top = list.y; // table header at list.y; first data row at list.y + 1
+                             // Selected row (index 0) should have Blue background somewhere across the row
+    let mut blue_found = false;
+    for x in list.x..list.x + list.width.min(buf.area.width) {
+        if buf[(x, list_y_top + 1)].style().bg == Some(Color::Blue) {
+            blue_found = true;
+            break;
+        }
+    }
+    assert!(blue_found, "selected row should be Blue across at least one cell");
+
+    // Hover row (index 1) should have Cyan background somewhere across the row
+    let mut cyan_found = false;
+    for x in list.x..list.x + list.width.min(buf.area.width) {
+        let cell = &buf[(x, list_y_top + 2)];
+        if cell.style().bg == Some(Color::Cyan) {
+            cyan_found = true;
+            break;
+        }
+    }
+    if !cyan_found {
+        // dump the hovered row for debugging
+        let mut row_chars = String::new();
+        let mut row_styles = String::new();
+        for x in 0..buf.area.width {
+            row_chars.push_str(buf[(x, list_y_top + 2)].symbol());
+            row_styles.push_str(match buf[(x, list_y_top + 2)].style().bg {
+                Some(Color::Blue) => "B",
+                Some(Color::Cyan) => "C",
+                Some(_) => "*",
+                None => ".",
+            });
+        }
+        panic!(
+            "hover row not Cyan. chars='{}' styles='{}' list=({},{},{},{})",
+            row_chars, row_styles, list.x, list.y, list.width, list.height
+        );
+    }
+    assert!(cyan_found, "hover row should be Cyan across at least one cell");
 }

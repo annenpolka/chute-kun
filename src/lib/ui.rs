@@ -9,6 +9,8 @@ use crate::app::{App, View};
 use crate::clock::Clock;
 use crate::task::TaskState;
 
+const MIN_LIST_LINES: u16 = 3; // table header + at least two rows
+
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.area();
     let header_line = header_title_line(app_display_base(app), app);
@@ -16,18 +18,19 @@ pub fn draw(f: &mut Frame, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
+    // Optional active-task banner just under the tabs
+    let active_banner = format_active_banner(app);
+
     // Pre-compute wrapped help lines for current width, to size the layout.
     let help_lines = help_lines_for_width(app, inner.width.max(1));
-    // Clamp help height so the task list keeps at least 1 row visible
+    // Clamp help height so the task table keeps at least header + two rows visible
     let mut help_height = help_lines.len() as u16; // 1+ lines depending on width
-    let max_help = inner.height.saturating_sub(2); // tabs(1) + list(>=1)
+    let reserved = 1 /* tabs */ + if active_banner.is_some() { 1 } else { 0 } + MIN_LIST_LINES;
+    let max_help = inner.height.saturating_sub(reserved);
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
     help_height = help_height.max(1);
-
-    // Optional active-task banner just under the tabs
-    let active_banner = format_active_banner(app);
 
     // Split inner area: tabs, optional banner, task list, help block.
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
@@ -273,16 +276,17 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Keep layout consistent with `draw`: tabs, content, help block
+    // Keep layout consistent with `draw`: tabs, optional banner, content, help block
+    let active_banner = format_active_banner(app);
     let help_lines = help_lines_for_width(app, inner.width.max(1));
-    // Clamp help height so the task list keeps at least 1 row visible
+    // Clamp help height so the task table keeps at least header + two rows visible
     let mut help_height = help_lines.len() as u16;
-    let max_help = inner.height.saturating_sub(2);
+    let reserved = 1 /* tabs */ + if active_banner.is_some() { 1 } else { 0 } + MIN_LIST_LINES;
+    let max_help = inner.height.saturating_sub(reserved);
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
     help_height = help_height.max(1);
-    let active_banner = format_active_banner(app);
     let mut constraints: Vec<Constraint> = vec![Constraint::Length(1)];
     if active_banner.is_some() {
         constraints.push(Constraint::Length(1));
@@ -511,11 +515,17 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
                 0
             }
         ));
-        let mut row = Row::new(vec![planned_cell, actual_cell, title_cell]);
-        if i == selected {
-            row = row.style(Style::default().bg(Color::Blue));
+        let highlight_bg = if i == selected {
+            Some(Color::Blue)
         } else if hovered == Some(i) {
-            row = row.style(Style::default().bg(Color::Cyan));
+            Some(Color::Cyan)
+        } else {
+            None
+        };
+        let mut row = Row::new(vec![planned_cell, actual_cell, title_cell]);
+        if let Some(bg) = highlight_bg {
+            let s = Style::default().bg(bg);
+            row = row.style(s);
         }
         rows.push(row);
     }
@@ -885,17 +895,19 @@ pub fn compute_layout(app: &App, area: Rect) -> (Rect, Option<Rect>, Rect, Rect)
         height: area.height.saturating_sub(2),
     };
 
-    // Help height depends on wrapping for the current width
+    // Optional active banner allocates one line under tabs
+    let has_banner = format_active_banner(app).is_some();
+
+    // Help height depends on wrapping for the current width; keep at least
+    // table header + two rows visible in the list area.
     let help_lines = help_lines_for_width(app, inner.width.max(1));
     let mut help_height = help_lines.len() as u16;
-    let max_help = inner.height.saturating_sub(2); // tabs + list(>=1)
+    let reserved = 1 /* tabs */ + if has_banner { 1 } else { 0 } + MIN_LIST_LINES;
+    let max_help = inner.height.saturating_sub(reserved);
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
     help_height = help_height.max(1);
-
-    // Optional active banner allocates one line under tabs
-    let has_banner = format_active_banner(app).is_some();
     let tabs = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
     let mut y = inner.y + 1;
     let banner = if has_banner {
