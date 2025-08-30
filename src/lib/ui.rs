@@ -9,6 +9,12 @@ use crate::app::{App, View};
 use crate::clock::Clock;
 use crate::task::TaskState;
 
+// Theme: darker list highlights for better contrast with default light (white) text.
+// These colors aim to keep contrast acceptable on common terminals while avoiding
+// the eye‑searing effect of bright Blue/Cyan backgrounds.
+pub const SELECTED_ROW_BG: Color = Color::Rgb(0, 60, 120); // dark blue
+pub const HOVER_ROW_BG: Color = Color::Rgb(0, 100, 100); // dark cyan/teal
+
 const MIN_LIST_LINES: u16 = 3; // table header + at least two rows
 
 pub fn draw(f: &mut Frame, app: &App) {
@@ -516,9 +522,9 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
             }
         ));
         let highlight_bg = if i == selected {
-            Some(Color::Blue)
+            Some(SELECTED_ROW_BG)
         } else if hovered == Some(i) {
-            Some(Color::Cyan)
+            Some(HOVER_ROW_BG)
         } else {
             None
         };
