@@ -26,16 +26,19 @@ pub fn draw(f: &mut Frame, app: &App) {
     }
     help_height = help_height.max(1);
 
-    // Split inner area: tabs on top, task list, help block at bottom (if space).
+    // Optional active-task banner just under the tabs
+    let active_banner = format_active_banner(app);
+
+    // Split inner area: tabs, optional banner, task list, help block.
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(help_height.max(1)),
-        ])
-        .split(inner);
+    let mut constraints: Vec<Constraint> = vec![Constraint::Length(1)];
+    if active_banner.is_some() {
+        constraints.push(Constraint::Length(1));
+    }
+    constraints.push(Constraint::Min(0));
+    constraints.push(Constraint::Length(help_height.max(1)));
+    let chunks =
+        Layout::default().direction(Direction::Vertical).constraints(constraints).split(inner);
 
     // Tabs for date views
     let (titles, selected) = tab_titles(app);
@@ -45,6 +48,14 @@ pub fn draw(f: &mut Frame, app: &App) {
         .highlight_style(Style::default().fg(Color::Yellow))
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
+
+    // If we have an active banner, render it right below tabs
+    let mut content_idx = 1usize; // index into chunks for main content
+    if let Some(line) = active_banner {
+        let para = Paragraph::new(line);
+        f.render_widget(para, chunks[1]);
+        content_idx = 2;
+    }
 
     // Main content: if in stepper, render a styled line with highlighted minutes
     if app.is_estimate_editing() {
@@ -62,12 +73,12 @@ pub fn draw(f: &mut Frame, app: &App) {
         }
         line.spans.push(Span::raw("  (+/-5m or j/k, Enter=OK Esc=Cancel)"));
         let para = Paragraph::new(line);
-        f.render_widget(para, chunks[1]);
+        f.render_widget(para, chunks[content_idx]);
     } else if app.in_input_mode() {
         // In input/command modes, render plain paragraph without row highlight
         let lines = format_task_lines(app).join("\n");
         let para = Paragraph::new(lines);
-        f.render_widget(para, chunks[1]);
+        f.render_widget(para, chunks[content_idx]);
     } else {
         // Normal list rendering with selected-row background highlight
         let content_lines = format_task_lines(app);
@@ -89,16 +100,18 @@ pub fn draw(f: &mut Frame, app: &App) {
             }
         }
         let para = Paragraph::new(styled);
-        f.render_widget(para, chunks[1]);
+        f.render_widget(para, chunks[content_idx]);
     }
 
     // Help block at the bottom (wrapped to fit width)
-    if chunks.len() >= 3 && chunks[2].height > 0 {
+    // When an active banner is present, help resides at the last chunk, not index 2.
+    let help_idx = chunks.len().saturating_sub(1);
+    if chunks[help_idx].height > 0 {
         let help_text = help_lines.join("\n");
         let help = Paragraph::new(help_text)
             .style(Style::default().fg(Color::DarkGray))
             .wrap(Wrap { trim: true });
-        f.render_widget(help, chunks[2]);
+        f.render_widget(help, chunks[help_idx]);
     }
 
     // Overlay: centered delete confirmation popup with colored text
@@ -143,14 +156,15 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         help_height = help_height.min(max_help);
     }
     help_height = help_height.max(1);
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(help_height.max(1)),
-        ])
-        .split(inner);
+    let active_banner = format_active_banner(app);
+    let mut constraints: Vec<Constraint> = vec![Constraint::Length(1)];
+    if active_banner.is_some() {
+        constraints.push(Constraint::Length(1));
+    }
+    constraints.push(Constraint::Min(0));
+    constraints.push(Constraint::Length(help_height.max(1)));
+    let chunks =
+        Layout::default().direction(Direction::Vertical).constraints(constraints).split(inner);
 
     let (titles, selected) = tab_titles(app);
     let titles: Vec<Line> = titles.into_iter().map(Line::from).collect();
@@ -159,6 +173,14 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         .highlight_style(Style::default().fg(Color::Yellow))
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
+
+    // Optional banner under tabs
+    let mut content_idx = 1usize;
+    if let Some(line) = active_banner {
+        let para = Paragraph::new(line);
+        f.render_widget(para, chunks[1]);
+        content_idx = 2;
+    }
 
     // Content with injected clock, using styled lines for selection highlight
     let mut styled: Vec<Line> =
@@ -175,17 +197,18 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         }
     }
     let para = Paragraph::new(styled);
-    if chunks.len() >= 2 && chunks[1].height > 0 {
-        f.render_widget(para, chunks[1]);
+    if chunks.len() > content_idx && chunks[content_idx].height > 0 {
+        f.render_widget(para, chunks[content_idx]);
     }
 
     // Help block at the bottom (wrapped to fit width)
-    if chunks.len() >= 3 && chunks[2].height > 0 {
+    let help_idx = chunks.len().saturating_sub(1);
+    if chunks[help_idx].height > 0 {
         let help_text = help_lines.join("\n");
         let help = Paragraph::new(help_text)
             .style(Style::default().fg(Color::DarkGray))
             .wrap(Wrap { trim: true });
-        f.render_widget(help, chunks[2]);
+        f.render_widget(help, chunks[help_idx]);
     }
 
     // Overlay: centered delete confirmation popup with colored text
@@ -468,4 +491,25 @@ pub fn help_lines_for_width(app: &App, width: u16) -> Vec<String> {
 
 fn app_display_base(app: &App) -> u16 {
     app.config.day_start_minutes
+}
+
+/// Build a one-line banner describing the currently running task, if any.
+/// Example: "Now: > Focus Work (est:30m act:3m 12s)"
+pub fn format_active_banner(app: &App) -> Option<Line<'static>> {
+    let idx = app.day.active_index()?;
+    let t = &app.day.tasks[idx];
+    let mut line = Line::default();
+    line.spans.push(Span::styled(
+        "Now:".to_string(),
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+    ));
+    line.spans.push(Span::raw(" "));
+    line.spans.push(Span::raw(state_icon(t.state).to_string()));
+    line.spans.push(Span::raw(" "));
+    line.spans.push(Span::styled(t.title.clone(), Style::default().fg(Color::Cyan)));
+    line.spans.push(Span::raw(format!(
+        " (est:{}m act:{}m {}s)",
+        t.estimate_min, t.actual_min, t.actual_carry_sec
+    )));
+    Some(line)
 }
