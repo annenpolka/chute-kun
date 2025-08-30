@@ -45,6 +45,8 @@ pub struct App {
 enum InputKind {
     Normal,
     Interrupt,
+    Command,
+    EstimateEdit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,37 +76,78 @@ impl App {
     pub fn handle_key(&mut self, code: KeyCode) {
         // If we are in input mode, interpret keys as text editing/submit/cancel
         if let Some(input) = self.input.as_mut() {
-            match code {
-                KeyCode::Enter => {
-                    let (default_title, est) = match input.kind {
-                        InputKind::Normal => ("New Task", 25u16),
-                        InputKind::Interrupt => ("Interrupt", 15u16),
-                    };
-                    let title = if input.buffer.trim().is_empty() {
-                        default_title.to_string()
-                    } else {
-                        input.buffer.trim().to_string()
-                    };
-                    let idx = self.add_task(&title, est);
-                    self.selected = idx;
-                    self.input = None;
-                }
-                KeyCode::Esc => {
-                    self.input = None;
-                }
-                KeyCode::Backspace => {
-                    input.buffer.pop();
-                }
-                KeyCode::Char(c) => {
-                    input.buffer.push(c);
-                }
-                _ => {}
+            match input.kind {
+                InputKind::Normal | InputKind::Interrupt => match code {
+                    KeyCode::Enter => {
+                        let (default_title, est) = match input.kind {
+                            InputKind::Normal => ("New Task", 25u16),
+                            InputKind::Interrupt => ("Interrupt", 15u16),
+                            _ => unreachable!(),
+                        };
+                        let title = if input.buffer.trim().is_empty() {
+                            default_title.to_string()
+                        } else {
+                            input.buffer.trim().to_string()
+                        };
+                        let idx = self.add_task(&title, est);
+                        self.selected = idx;
+                        self.input = None;
+                    }
+                    KeyCode::Esc => {
+                        self.input = None;
+                    }
+                    KeyCode::Backspace => {
+                        input.buffer.pop();
+                    }
+                    KeyCode::Char(c) => {
+                        input.buffer.push(c);
+                    }
+                    _ => {}
+                },
+                InputKind::Command => match code {
+                    KeyCode::Enter => {
+                        let cmd = input.buffer.trim().to_string();
+                        self.apply_command(&cmd);
+                        self.input = None;
+                    }
+                    KeyCode::Esc => {
+                        self.input = None;
+                    }
+                    KeyCode::Backspace => {
+                        input.buffer.pop();
+                    }
+                    KeyCode::Char(c) => input.buffer.push(c),
+                    _ => {}
+                },
+                InputKind::EstimateEdit => match code {
+                    KeyCode::Enter | KeyCode::Esc => {
+                        // finish editing
+                        self.input = None;
+                    }
+                    KeyCode::Up => {
+                        self.day.adjust_estimate(self.selected, 5);
+                    }
+                    KeyCode::Down => {
+                        self.day.adjust_estimate(self.selected, -5);
+                    }
+                    _ => {}
+                },
             }
             return;
         }
         match code {
             KeyCode::Char('q') => {
                 self.should_quit = true;
+            }
+            KeyCode::Char(':') => {
+                // Open command palette
+                self.input = Some(Input { kind: InputKind::Command, buffer: String::new() });
+            }
+            KeyCode::Char('E') => {
+                // Enter estimate edit mode if a task is available
+                if !self.day.tasks.is_empty() {
+                    self.input = Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
+                }
             }
             KeyCode::Char('i') => {
                 // Enter input mode for a normal task
@@ -324,6 +367,12 @@ impl App {
     pub fn input_buffer(&self) -> Option<&str> {
         self.input.as_ref().map(|i| i.buffer.as_str())
     }
+    pub fn is_estimate_editing(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::EstimateEdit))
+    }
+    pub fn selected_estimate(&self) -> Option<u16> {
+        self.day.tasks.get(self.selected).map(|t| t.estimate_min)
+    }
 
     fn set_view(&mut self, v: View) {
         self.view = v;
@@ -367,5 +416,31 @@ impl App {
         self.selected = 0;
         self.active_accum_sec = 0;
         self.set_view(View::Today);
+    }
+
+    fn apply_command(&mut self, cmd: &str) {
+        // Supported: "est +15m", "est -5", "est 90m"
+        let mut it = cmd.split_whitespace();
+        let Some(head) = it.next() else { return; };
+        if head != "est" { return; }
+        let Some(arg) = it.next() else { return; };
+        let s = arg.trim();
+        if s.starts_with('+') || s.starts_with('-') {
+            // relative delta
+            let sign = if s.starts_with('+') { 1 } else { -1 };
+            let num_part = s[1..].trim_end_matches('m');
+            if let Ok(v) = num_part.parse::<i16>() {
+                let delta = v.saturating_mul(sign);
+                self.day.adjust_estimate(self.selected, delta);
+            }
+        } else {
+            // absolute minutes
+            let num_part = s.trim_end_matches('m');
+            if let Ok(v) = num_part.parse::<u16>() {
+                if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                    t.estimate_min = v;
+                }
+            }
+        }
     }
 }
