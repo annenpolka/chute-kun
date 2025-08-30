@@ -4,7 +4,7 @@ use crate::task::{DayPlan, Task};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Snapshot of user-visible task state.
 /// - versioned for forwards/backwards compatibility
@@ -73,4 +73,23 @@ pub fn load_from_path<P: AsRef<Path>>(path: P, config: Config) -> Result<Option<
     let s = fs::read_to_string(path).context("read snapshot file")?;
     let app = load_from_str(&s, config)?;
     Ok(Some(app))
+}
+
+/// Resolve default snapshot file path with XDG semantics.
+/// Priority:
+/// 1) `CHUTE_KUN_STATE` env var (explicit override)
+/// 2) `XDG_DATA_HOME`/chute_kun/snapshot.toml
+/// 3) `$HOME/.local/share/chute_kun/snapshot.toml` (cross‑platform friendly)
+/// 4) Fallback: `dirs::data_dir()/chute_kun/snapshot.toml`
+pub fn default_state_path() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("CHUTE_KUN_STATE") {
+        return Some(PathBuf::from(p));
+    }
+    if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+        return Some(PathBuf::from(xdg).join("chute_kun").join("snapshot.toml"));
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        return Some(PathBuf::from(home).join(".local/share/chute_kun/snapshot.toml"));
+    }
+    dirs::data_dir().map(|b| b.join("chute_kun").join("snapshot.toml"))
 }

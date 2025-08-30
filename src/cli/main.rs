@@ -7,6 +7,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use chute_kun::{app::App, ui};
 use chute_kun::config::Config;
+use chute_kun::storage;
 
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
@@ -37,8 +38,33 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // Optional state path override: --state <path>
+    let mut args = std::env::args().skip(1);
+    let mut state_path_override: Option<std::path::PathBuf> = None;
+    while let Some(a) = args.next() {
+        if a == "--state" {
+            if let Some(p) = args.next() {
+                state_path_override = Some(std::path::PathBuf::from(p));
+            } else {
+                eprintln!("--state requires a file path");
+                std::process::exit(2);
+            }
+        }
+    }
+
     let mut terminal = setup_terminal()?;
-    let mut app = App::new();
+
+    // Load config and state snapshot (if found) from XDG data path or override.
+    let cfg = Config::load();
+    let chosen_path = state_path_override
+        .or_else(|| storage::default_state_path())
+        .expect("could not resolve default state path");
+
+    let mut app = match storage::load_from_path(&chosen_path, cfg.clone())? {
+        Some(a) => a,
+        None => App::with_config(cfg),
+    };
+
     // Real-time ticking (seconds) — accumulate elapsed millis and convert to seconds.
     let mut last_instant = Instant::now();
     let mut carry_millis: u64 = 0;
@@ -65,6 +91,11 @@ fn main() -> Result<()> {
         }
     }
 
+    // Auto-save snapshot on exit.
+    if let Err(e) = storage::save_to_path(&app, &chosen_path) {
+        // Avoid crashing; report to stderr after restoring terminal.
+        tracing::error!("failed to save snapshot: {e}");
+    }
     restore_terminal(terminal)?;
     Ok(())
 }
