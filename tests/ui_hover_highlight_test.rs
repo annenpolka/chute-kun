@@ -13,7 +13,7 @@ fn hover_row_renders_in_cyan_while_selection_stays_blue() {
     // Compute list rect and move the mouse over the second row
     let area = Rect { x: 0, y: 0, width: 40, height: 10 };
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, area);
-    let row_y = list.y + 1; // index 1
+    let row_y = list.y + 2; // index 1 (first data row is list.y + 1)
     let col_x = list.x + 2;
     app.handle_mouse_move(col_x, row_y, area);
     assert_eq!(app.hovered_index(), Some(1), "hovered index should be 1 after mouse move");

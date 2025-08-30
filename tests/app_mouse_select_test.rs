@@ -15,7 +15,7 @@ fn mouse_click_selects_list_row() {
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, area);
 
     // Click roughly on the second row inside the list area.
-    let row_y = list.y + 1; // index 1 => second task
+    let row_y = list.y + 2; // index 1 => second task (header at list.y)
     let col_x = list.x + 2; // a safe in-bounds x
     let ev = MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),

@@ -10,8 +10,8 @@ fn double_click_starts_then_stops_task() {
     let area = Rect { x: 0, y: 0, width: 60, height: 10 };
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, area);
 
-    // Target row 1 (title B)
-    let row_y = list.y + 1;
+    // Target row 1 (title B). Header is at list.y; first data row at list.y+1
+    let row_y = list.y + 2;
     let col_x = list.x + 2;
 
     // Two quick left clicks -> start task at index 1
@@ -27,7 +27,7 @@ fn double_click_starts_then_stops_task() {
 
     // Layout shifts because an active banner appears; recompute list and row_y
     let (_t2, _b2, list2, _h2) = ui::compute_layout(&app, area);
-    let row_y2 = list2.y + 1; // same index (1)
+    let row_y2 = list2.y + 2; // same index (1)
     let ev2 = |kind| MouseEvent {
         kind,
         column: col_x,

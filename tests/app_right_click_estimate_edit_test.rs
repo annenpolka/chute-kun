@@ -10,8 +10,8 @@ fn right_click_opens_estimate_editor_on_row() {
     let area = Rect { x: 0, y: 0, width: 60, height: 10 };
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, area);
 
-    // Right click on second row
-    let row_y = list.y + 1;
+    // Right click on second row (header at list.y)
+    let row_y = list.y + 2;
     let col_x = list.x + 2;
     app.handle_mouse_event(
         MouseEvent {
