@@ -1,8 +1,8 @@
 #[path = "lib/app.rs"]
 pub mod app;
+#[path = "lib/clock.rs"]
+pub mod clock;
 #[path = "lib/task.rs"]
 pub mod task;
 #[path = "lib/ui.rs"]
 pub mod ui;
-#[path = "lib/clock.rs"]
-pub mod clock;

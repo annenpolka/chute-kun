@@ -25,4 +25,3 @@ fn active_progress_shortens_next_task_scheduled_time() {
     // B should now start at 09:20 instead of 09:30
     assert!(lines[1].starts_with("09:20 "));
 }
-

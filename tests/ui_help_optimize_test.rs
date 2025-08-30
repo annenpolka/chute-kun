@@ -40,4 +40,3 @@ fn future_and_past_help_hide_task_actions() {
     assert!(s.contains("Tab"));
     assert!(s.contains("q: quit"));
 }
-

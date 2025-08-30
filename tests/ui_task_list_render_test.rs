@@ -1,7 +1,6 @@
 use chute_kun::{app::App, ui};
 use ratatui::{backend::TestBackend, Terminal};
 
-
 #[test]
 fn renders_empty_hint_then_task_title() {
     let backend = TestBackend::new(40, 6);

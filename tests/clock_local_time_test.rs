@@ -19,13 +19,14 @@ fn clock_trait_can_be_implemented_for_fixed_clock_in_tests() {
     // Local injector for tests: prove trait-based injection works.
     struct FixedClock(u16);
     impl Clock for FixedClock {
-        fn now_minutes(&self) -> u16 { self.0 }
+        fn now_minutes(&self) -> u16 {
+            self.0
+        }
     }
 
     let c = FixedClock(9 * 60 + 30);
     assert_eq!(c.now_minutes(), 9 * 60 + 30);
 
     // Also ensure SystemClock type exists and compiles
-    let _ = SystemClock::default();
+    let _ = SystemClock;
 }
-

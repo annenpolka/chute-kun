@@ -24,4 +24,3 @@ impl Clock for SystemClock {
 pub fn system_now_minutes() -> u16 {
     SystemClock.now_minutes()
 }
-

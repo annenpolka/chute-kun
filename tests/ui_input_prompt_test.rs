@@ -10,6 +10,5 @@ fn input_mode_shows_prompt_line() {
     app.handle_key(KeyCode::Char('s'));
     app.handle_key(KeyCode::Char('t'));
     let lines = ui::format_task_lines(&app);
-    assert!(lines.get(0).unwrap().starts_with("Input: Test"));
+    assert!(lines.first().unwrap().starts_with("Input: Test"));
 }
-
