@@ -178,8 +178,14 @@ pub fn format_header_line(now_min: u16, app: &App) -> String {
 
     let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
     let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
-    let carry_sec: u32 =
-        if app.day.active_index().is_some() { app.active_carry_seconds() as u32 } else { 0 };
+    // Show partial seconds not only while active, but also while paused.
+    // This avoids "truncating" seconds from the header when the user pauses.
+    let has_paused = app.day.tasks.iter().any(|t| matches!(t.state, TaskState::Paused));
+    let carry_sec: u32 = if app.day.active_index().is_some() || has_paused {
+        app.active_carry_seconds() as u32
+    } else {
+        0
+    };
 
     let total_act_sec = total_act_min * 60 + carry_sec;
     let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
