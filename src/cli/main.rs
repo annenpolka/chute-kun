@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::{cursor, event, execute, terminal};
+use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags, PopKeyboardEnhancementFlags};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use chute_kun::{app::App, ui};
@@ -10,13 +11,23 @@ use chute_kun::config::Config;
 
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
     terminal::enable_raw_mode()?;
+    // Enter alternate screen + hide cursor first
     execute!(stdout(), terminal::EnterAlternateScreen, cursor::Hide)?;
+    // Try to enable progressive keyboard enhancement so modifiers like Shift+Enter are reported
+    if terminal::supports_keyboard_enhancement().unwrap_or(false) {
+        let flags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+            | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+            | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES;
+        let _ = execute!(stdout(), PushKeyboardEnhancementFlags(flags));
+    }
     let backend = CrosstermBackend::new(stdout());
     let terminal = Terminal::new(backend)?;
     Ok(terminal)
 }
 
 fn restore_terminal(mut terminal: Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<()> {
+    // Best-effort pop keyboard enhancement flags if they were pushed
+    let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
     execute!(terminal.backend_mut(), terminal::LeaveAlternateScreen, cursor::Show)?;
     terminal::disable_raw_mode()?;
     Ok(())
