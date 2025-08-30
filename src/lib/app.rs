@@ -154,6 +154,9 @@ impl App {
             KeyCode::Char('p') => {
                 self.postpone_selected();
             }
+            KeyCode::Char('b') => {
+                self.bring_selected_from_future();
+            }
             KeyCode::Tab => {
                 self.set_view(self.view.next());
             }
@@ -256,6 +259,9 @@ impl App {
             A::Postpone => {
                 self.postpone_selected();
             }
+            A::BringToToday => {
+                self.bring_selected_from_future();
+            }
             A::ViewNext => {
                 self.set_view(self.view.next());
             }
@@ -297,6 +303,24 @@ impl App {
         }
         if !self.day.tasks.is_empty() {
             self.selected = self.selected.min(self.day.tasks.len() - 1);
+        } else {
+            self.selected = 0;
+        }
+    }
+
+    /// Bring a task from Future to Today (mirror of postpone). No-op unless in Future view.
+    pub fn bring_selected_from_future(&mut self) {
+        if self.view != View::Future || self.tomorrow.is_empty() {
+            return;
+        }
+        let idx = self.selected.min(self.tomorrow.len() - 1);
+        let task = self.tomorrow.remove(idx);
+        // Ensure it becomes Planned in Today and append to the end.
+        let t = Task { state: crate::task::TaskState::Planned, ..task };
+        self.day.add_task(t);
+        // Adjust selection within Future list
+        if !self.tomorrow.is_empty() {
+            self.selected = self.selected.min(self.tomorrow.len() - 1);
         } else {
             self.selected = 0;
         }
