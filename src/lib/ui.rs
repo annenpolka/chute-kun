@@ -40,31 +40,33 @@ pub fn draw(f: &mut Frame, app: &App) {
         .divider(Span::raw("│"));
     f.render_widget(tabs, chunks[0]);
 
-    // Main content: input prompt when in input mode; otherwise task list.
-    // Render as styled lines so we can highlight the selected row.
-    let content_lines = if app.in_input_mode() {
-        let buf = app.input_buffer().unwrap_or("");
-        vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)]
-    } else {
-        format_task_lines(app)
-    };
-    let mut styled: Vec<Line> = content_lines.into_iter().map(Line::from).collect();
-    if !app.in_input_mode() {
-        // Only highlight when showing task lists and there is at least one task in the current view.
-        let cur_len = match app.view() {
-            View::Past => app.history_tasks().len(),
-            View::Today => app.day.tasks.len(),
-            View::Future => app.tomorrow_tasks().len(),
-        };
-        if cur_len > 0 {
-            let idx = app.selected_index().min(styled.len().saturating_sub(1));
-            if let Some(line) = styled.get_mut(idx) {
-                line.style = Style::default().bg(Color::Blue);
-            }
+    // Main content: if in stepper, render a styled line with highlighted minutes
+    if app.is_estimate_editing() {
+        let est = app.selected_estimate().unwrap_or(0);
+        let title = app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| t.title.as_str())
+            .unwrap_or("");
+        let mut line = Line::default();
+        line.spans.push(Span::raw("Estimate: "));
+        line.spans.push(Span::styled(
+            format!("{}m", est),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        ));
+        if !title.is_empty() {
+            line.spans.push(Span::raw(" — "));
+            line.spans.push(Span::styled(title.to_string(), Style::default().fg(Color::Cyan)));
         }
+        line.spans.push(Span::raw("  (+/-5m or j/k, Enter=OK Esc=Cancel)"));
+        let para = Paragraph::new(line);
+        f.render_widget(para, chunks[1]);
+    } else {
+        let lines = format_task_lines(app).join("\n");
+        let para = Paragraph::new(lines);
+        f.render_widget(para, chunks[1]);
     }
-    let para = Paragraph::new(styled);
-    f.render_widget(para, chunks[1]);
 
     // Help block at the bottom (wrapped to fit width)
     if chunks.len() >= 3 && chunks[2].height > 0 {
@@ -154,6 +156,36 @@ pub fn format_task_lines(app: &App) -> Vec<String> {
 pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
     if app.in_input_mode() {
         let buf = app.input_buffer().unwrap_or("");
+        // Estimate edit mode shows explicit stepper line with task title
+        if app.is_estimate_editing() {
+            let est = app.selected_estimate().unwrap_or(0);
+            let title = app
+                .day
+                .tasks
+                .get(app.selected_index())
+                .map(|t| t.title.as_str())
+                .unwrap_or("");
+            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+            return vec![format!(
+                "Estimate: {}m{}  (+/-5m, Enter=OK Esc=Cancel)",
+                est, suffix
+            )];
+        }
+        // Command palette prompt (+ show target task title)
+        if app.is_command_mode() {
+            let title = app
+                .day
+                .tasks
+                .get(app.selected_index())
+                .map(|t| t.title.as_str())
+                .unwrap_or("");
+            let suffix = if title.is_empty() { "".to_string() } else { format!(" — {}", title) };
+            return vec![format!(
+                "Command: {} _{}  (Enter=Run Esc=Cancel)",
+                buf, suffix
+            )];
+        }
+        // Fallback: normal input mode for adding a task
         return vec![format!("Input: {} _  (Enter=Add Esc=Cancel)", buf)];
     }
     match app.view() {
