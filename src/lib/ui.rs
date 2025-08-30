@@ -11,8 +11,8 @@ use crate::task::TaskState;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.area();
-    let header = format_header_line(app_display_base(app), app);
-    let block = Block::default().title(header).borders(Borders::ALL);
+    let header_line = header_title_line(app_display_base(app), app);
+    let block = Block::default().title(header_line).borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -129,8 +129,8 @@ pub fn draw(f: &mut Frame, app: &App) {
 pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     let area: Rect = f.area();
     let now = clock.now_minutes();
-    let header = format_header_line(now, app);
-    let block = Block::default().title(header).borders(Borders::ALL);
+    let header_line = header_title_line(now, app);
+    let block = Block::default().title(header_line).borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -311,6 +311,57 @@ fn state_icon(state: TaskState) -> &'static str {
         TaskState::Paused => "=",
         TaskState::Done => "x",
     }
+}
+
+/// Colorful, lazygit-inspired title line for the outer `Block`.
+/// This keeps `format_header_line` unchanged for tests that rely on plain text,
+/// while rendering a more readable, colorful header in the UI.
+pub fn header_title_line(now_min: u16, app: &App) -> Line<'static> {
+    // Reuse the same numbers as `format_header_line` to stay consistent.
+    let esd_min = app.day.esd(now_min);
+    let esd_h = esd_min / 60;
+    let esd_m = esd_min % 60;
+
+    let total_est_min: u32 = app.day.tasks.iter().map(|t| t.estimate_min as u32).sum();
+    let total_act_min: u32 = app.day.tasks.iter().map(|t| t.actual_min as u32).sum();
+    let carry_sec: u32 = app.day.tasks.iter().map(|t| t.actual_carry_sec as u32).sum();
+    let total_act_sec = total_act_min * 60 + carry_sec;
+    let rem_total_sec = (total_est_min * 60).saturating_sub(total_act_sec);
+    let rem_m = (rem_total_sec / 60) as u16;
+    let rem_s = (rem_total_sec % 60) as u16;
+    let act_m = (total_act_sec / 60) as u16;
+    let act_s = (total_act_sec % 60) as u16;
+
+    // Colors: pills with bright BGs and bold text, separators in dim gray.
+    let sep_style = Style::default().fg(Color::DarkGray);
+
+    let pill = |label: &str, bg: Color| -> Span {
+        Span::styled(
+            label.to_string(),
+            Style::default().fg(Color::Black).bg(bg).add_modifier(Modifier::BOLD),
+        )
+    };
+    let val = |text: String, fg: Color| -> Span {
+        Span::styled(text, Style::default().fg(fg).add_modifier(Modifier::BOLD))
+    };
+
+    let mut line: Line<'static> = Line::default();
+    // ESD
+    line.spans.push(pill("ESD", Color::Blue));
+    line.spans.push(Span::raw(" "));
+    line.spans.push(val(format!("{:02}:{:02}", esd_h, esd_m), Color::Cyan));
+    line.spans.push(Span::styled("  |  ", sep_style));
+    // Est remaining
+    line.spans.push(pill("Est", Color::Green));
+    line.spans.push(Span::raw(" "));
+    line.spans.push(val(format!("{}m {}s", rem_m, rem_s), Color::Green));
+    line.spans.push(Span::styled("  |  ", sep_style));
+    // Actual total
+    line.spans.push(pill("Act", Color::Magenta));
+    line.spans.push(Span::raw(" "));
+    line.spans.push(val(format!("{}m {}s", act_m, act_s), Color::Magenta));
+
+    line
 }
 
 pub fn format_header_line(now_min: u16, app: &App) -> String {
