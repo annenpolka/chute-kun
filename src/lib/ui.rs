@@ -477,18 +477,21 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
     }
     // active index not needed for seconds rendering anymore (per-task seconds)
 
-    // Build schedule start times from `now_min`, adding remaining durations of preceding tasks.
+    // Build schedule start times from `now_min`, adding durations of preceding tasks.
+    // ポイント: Done(完了) タスクも「見積時間(estimate_min)」で次以降のPlanを押し出す。
     let mut cursor = now_min;
     let starts: Vec<u16> = tasks
         .iter()
         .map(|t| {
             let this = cursor;
-            // remaining minutes for this task (ignoring partial seconds for simplicity)
-            let remaining = match t.state {
-                TaskState::Done => 0,
+            // remaining/planned minutes for this task (ignore partial seconds).
+            // - Done: use estimate to keep planned schedule consistent with original plan
+            // - Others: use remaining = estimate - actual
+            let delta = match t.state {
+                TaskState::Done => t.estimate_min,
                 _ => t.estimate_min.saturating_sub(t.actual_min),
             };
-            cursor = cursor.saturating_add(remaining);
+            cursor = cursor.saturating_add(delta);
             this
         })
         .collect();
@@ -556,11 +559,11 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         .iter()
         .map(|t| {
             let this = cursor;
-            let remaining = match t.state {
-                TaskState::Done => 0,
+            let delta = match t.state {
+                TaskState::Done => t.estimate_min,
                 _ => t.estimate_min.saturating_sub(t.actual_min),
             };
-            cursor = cursor.saturating_add(remaining);
+            cursor = cursor.saturating_add(delta);
             this
         })
         .collect();

@@ -9,6 +9,7 @@ TaskChute の「プラン・ログ・ルーチン」のうち、まずは「プ�
 - Today/Past/Future の 3 ビュー切替とタスクリスト操作
 - Start/Pause/Resume/Finish（選択タスク）と実績の秒→分繰り上げ
 - 見積編集（±5m / j,k / 右クリック）と ESD（見込み終了時刻）のヘッダ表示
+- Plan(予定)列は `day_start` を起点に累積で算出。Done も見積時間で後続を押し出す（Active/Paused/Planned は残り時間を使用）。
 - 入力モード（新規/割込）と IME 日本語入力・貼り付け対応
 - 並べ替え・翌日送り・Future からの Bring・削除確認ダイアログ
 - 終了時に TOML スナップショットへ自動保存（XDG 準拠の既定パス）
