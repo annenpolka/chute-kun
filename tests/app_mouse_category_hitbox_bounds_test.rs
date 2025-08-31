@@ -18,7 +18,7 @@ fn bottom_area_click_does_not_toggle_category() {
 
     // Find dot X on the actual row
     let row_y = list.y + 1; // first data row
-    // Derive actual dot X by reading the buffer instead of assuming widths
+                            // Derive actual dot X by reading the buffer instead of assuming widths
     let dot_x = (list.x..list.x + list.width)
         .find(|&x| buf[(x, row_y)].symbol() == "●")
         .expect("dot not found in row");
@@ -27,7 +27,12 @@ fn bottom_area_click_does_not_toggle_category() {
     let click_y = list.y + list.height - 1; // bottom line of list area
     assert!(click_y > row_y);
 
-    let ev = MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column: dot_x, row: click_y, modifiers: KeyModifiers::empty() };
+    let ev = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: dot_x,
+        row: click_y,
+        modifiers: KeyModifiers::empty(),
+    };
     app.handle_mouse_event(ev, area);
 
     // Category should remain General (not toggled to Work)

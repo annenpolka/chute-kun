@@ -17,4 +17,3 @@ category_cycle = "z"
     app.handle_key_event(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::NONE));
     assert!(matches!(app.day.tasks[0].category, Category::Work));
 }
-

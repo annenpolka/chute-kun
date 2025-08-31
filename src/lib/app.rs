@@ -709,7 +709,13 @@ impl App {
     /// - Mouse move updates hover index.
     /// - Ignores clicks while in input/popup modes.
     pub fn handle_mouse_event(&mut self, ev: MouseEvent, area: Rect) {
-        if self.in_input_mode() || self.is_confirm_delete() || self.is_estimate_editing() || self.is_new_task_estimate() || self.is_command_mode() || self.is_category_picker() {
+        if self.in_input_mode()
+            || self.is_confirm_delete()
+            || self.is_estimate_editing()
+            || self.is_new_task_estimate()
+            || self.is_command_mode()
+            || self.is_category_picker()
+        {
             self.handle_mouse_in_popup(ev, area);
             return;
         }
@@ -1542,12 +1548,7 @@ impl App {
         self.selected = idx;
         // Initialize picker index to current category position
         use crate::task::Category as C;
-        let cur = self
-            .day
-            .tasks
-            .get(idx)
-            .map(|t| t.category)
-            .unwrap_or(C::General);
+        let cur = self.day.tasks.get(idx).map(|t| t.category).unwrap_or(C::General);
         self.cat_pick_idx = match cur {
             C::General => 0,
             C::Work => 1,

@@ -13,7 +13,7 @@ fn help_line_includes_primary_keys() {
     assert!(s.contains("Shift+Enter"));
     assert!(s.contains("start/pause"));
     // task operations
-    assert!(s.contains("I: interrupt"));
+    assert!(s.contains("Shift+i: interrupt"));
     assert!(s.contains("p: postpone"));
     assert!(s.contains("[: up"));
     assert!(s.contains("]: down"));

@@ -370,7 +370,10 @@ pub fn draw(f: &mut Frame, app: &App) {
         let options = category_options();
         for (i, (label, color, _cat)) in options.iter().enumerate() {
             let bullet = Span::styled("●".to_string(), Style::default().fg(*color));
-            let text = Span::styled((*label).to_string(), Style::default().fg(*color).add_modifier(Modifier::BOLD));
+            let text = Span::styled(
+                (*label).to_string(),
+                Style::default().fg(*color).add_modifier(Modifier::BOLD),
+            );
             let line = Line::from(vec![bullet, Span::raw(" "), text]);
             let mut row = Row::new(vec![Cell::from(line)]);
             if app.category_pick_index() == i {
@@ -379,7 +382,10 @@ pub fn draw(f: &mut Frame, app: &App) {
             rows.push(row);
         }
         let table = Table::new(rows, [Constraint::Min(10)])
-            .header(Row::new(vec![Cell::from("Category")]).style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)))
+            .header(
+                Row::new(vec![Cell::from("Category")])
+                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            )
             .block(Block::default().borders(Borders::ALL).title("Select Category (Enter)"));
         f.render_widget(table, inner);
     }
@@ -802,7 +808,12 @@ pub fn category_picker_hitboxes(_app: &App, popup: Rect) -> Vec<Rect> {
     let list_y = popup.y + 2; // leave a small margin
     let mut rects = Vec::new();
     for i in 0..category_options().len() as u16 {
-        rects.push(Rect { x: popup.x + 1, y: list_y + i, width: popup.width.saturating_sub(2), height: 1 });
+        rects.push(Rect {
+            x: popup.x + 1,
+            y: list_y + i,
+            width: popup.width.saturating_sub(2),
+            height: 1,
+        });
     }
     rects
 }
