@@ -1421,7 +1421,8 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
         while j < w && glyphs[j] == g && cells[j] == c {
             j += 1;
         }
-        let text: String = std::iter::repeat_n(g, j - i).collect();
+        // MSRV 1.74: `std::iter::repeat_n` stabilized later; use `repeat(...).take(...)`.
+        let text: String = std::iter::repeat(g).take(j - i).collect();
         let style = match c {
             Some(_) if g == '|' => Style::default().fg(Color::DarkGray),
             Some(color) => Style::default().fg(color).add_modifier(Modifier::BOLD),

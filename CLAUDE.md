@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chute_kun is a TaskChute-style task management TUI application built in Rust. It implements the TaskChute methodology for time management and productivity, featuring a terminal user interface built with ratatui and crossterm.
+Chute-kun is a TaskChute-style task management TUI application built in Rust. It implements the TaskChute methodology for time management and productivity, featuring a terminal user interface built with ratatui and crossterm.
 
 ## Architecture
 

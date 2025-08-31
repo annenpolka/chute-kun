@@ -5,7 +5,7 @@ use chute_kun::app::App;
 #[test]
 fn app_initial_state() {
     let app = App::new();
-    assert_eq!(app.title, "Chute_kun");
+    assert_eq!(app.title, "Chute-kun");
     assert!(!app.should_quit);
 }
 

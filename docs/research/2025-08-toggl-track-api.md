@@ -1,6 +1,6 @@
 # Toggl Track API — Research (as of 2025-08-31)
 
-This note summarizes the current Toggl Track public APIs relevant for integrating Chute_kun’s session model with Toggl time entries. Links point to official docs.
+This note summarizes the current Toggl Track public APIs relevant for integrating Chute-kun’s session model with Toggl time entries. Links point to official docs.
 
 ## Overview
 - **Base URL**: `https://api.track.toggl.com/api/v9` (Track API v9)
@@ -42,7 +42,7 @@ References
   - `description`: task title string
   - `start`: ISO‑8601 timestamp (e.g., `2025-08-31T09:05:00+09:00`)
   - `duration`: `-1` to indicate “running”
-  - `created_with`: e.g., `"chute_kun"` (please set an identifiable string)
+  - `created_with`: e.g., `"chute-kun"` (please set an identifiable string)
 - To finalize: either `PATCH /.../{id}/stop` or `PATCH /.../{id}` with explicit `stop` and positive `duration` in seconds.
 - Time zones: send explicit offsets (local or UTC). Toggl stores and renders in the user’s locale.
 
@@ -69,7 +69,7 @@ curl -s -u "$TOGGL_API_TOKEN:api_token" \
     "description": "Write spec: ESD logic",
     "start": "2025-08-31T10:12:00+09:00",
     "duration": -1,
-    "created_with": "chute_kun"
+    "created_with": "chute-kun"
   }' \
   https://api.track.toggl.com/api/v9/workspaces/$TOGGL_WORKSPACE_ID/time_entries
 ```
@@ -80,4 +80,3 @@ Stop it later:
 curl -s -u "$TOGGL_API_TOKEN:api_token" -X PATCH \
   https://api.track.toggl.com/api/v9/workspaces/$TOGGL_WORKSPACE_ID/time_entries/$ENTRY_ID/stop
 ```
-

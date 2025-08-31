@@ -162,7 +162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "chute_kun"
+name = "chute-kun"
 version = "0.1.0"
 dependencies = [
  "anyhow",

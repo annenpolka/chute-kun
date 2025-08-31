@@ -1,4 +1,4 @@
-# Chute_kun
+# Chute-kun
 
 TaskChute をローカルで素早く回す Rust 製 TUI（ratatui + crossterm）
 
@@ -42,8 +42,8 @@ cargo test
 設定（任意）:
 
 ```
-chute_kun --init-config
-chute_kun --set-day-start HH:MM   # 予定の基準時刻を変更（config.toml を更新）
+chute --init-config
+chute --set-day-start HH:MM   # 予定の基準時刻を変更（config.toml を更新）
 ```
 
 TUI から変更（永続化）:
@@ -53,6 +53,12 @@ TUI から変更（永続化）:
 ```
 
 生成場所やキー設定の詳細は `docs/setup/configuration.md` を参照。
+
+インストール（crates.io 公開後）:
+
+```
+cargo install chute-kun
+```
 
 ### 表示モード切替（List ↔ Calendar）
 

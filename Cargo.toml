@@ -1,10 +1,31 @@
 [package]
-name = "chute_kun"
+name = "chute-kun"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+
+# MSRV
+rust-version = "1.74"
 description = "TaskChute + Todoist CLI/TUI — Rust TUI template using ratatui + crossterm"
-repository = "https://example.com/placeholder"
+# NOTE: Set these URLs to your real locations before `cargo publish`.
+# e.g., https://github.com/<owner>/chute_kun
+repository = "https://github.com/annenpolka/chute-kun"
+homepage = "https://github.com/annenpolka/chute-kun"
+documentation = "https://docs.rs/chute-kun"
+readme = "README.md"
+keywords = ["tui", "cli", "taskchute", "time-tracking", "time-management"]
+# Valid category slugs must come from https://crates.io/category_slugs
+categories = ["command-line-utilities", "date-and-time"]
+
+# Keep the published crate lean. Adjust as needed, but do not exclude README/LICENSE.
+exclude = [
+  "/.github/**",
+  "/.husky/**",
+  "/docs/**",
+  "/.pre-commit-config.yaml",
+  "/CLAUDE.md",
+  "/AGENTS.md",
+]
 
 [dependencies]
 anyhow = "1"
@@ -30,5 +51,5 @@ tempfile = "3"
 unicode-width = "0.2"
 
 [[bin]]
-name = "chute_kun"
+name = "chute"
 path = "src/cli/main.rs"
