@@ -44,7 +44,7 @@ fn bottom_gauge_shows_category_segments_over_24h() {
     let full = Rect { x: 0, y: 0, width: buf.area.width, height: buf.area.height };
     let (_tabs, _banner, _list, help) = ui::compute_layout(&app, full);
     assert!(help.height >= 1, "help area should exist to host the gauge");
-    let gauge_y = help.y + help.height - 1; // last line of help hosts the gauge
+    let gauge_y = help.y; // first line of help hosts the gauge
 
     // Map minute -> X coordinate in the gauge line, mirroring ui logic (24h across width)
     let map_x = |m: u16| -> u16 {

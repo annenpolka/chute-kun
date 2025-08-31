@@ -26,7 +26,7 @@ fn bottom_gauge_shows_now_marker() {
 
     let full = Rect { x: 0, y: 0, width: buf.area.width, height: buf.area.height };
     let (_tabs, _banner, _list, help) = ui::compute_layout(&app, full);
-    let gauge_y = help.y + help.height - 1;
+    let gauge_y = help.y;
 
     // Map minutes to X like the gauge does
     let map_x = |m: u16| -> u16 {

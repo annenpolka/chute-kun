@@ -26,8 +26,8 @@ fn bottom_gauge_has_thick_ticks_and_labels() {
     let full = Rect { x: 0, y: 0, width: buf.area.width, height: buf.area.height };
     let (_tabs, _banner, _list, help) = ui::compute_layout(&app, full);
     assert!(help.height >= 2, "help area must have at least two lines");
-    let gauge_y = help.y + help.height - 1;
-    let label_y = gauge_y - 1;
+    let gauge_y = help.y;
+    let label_y = gauge_y + 1;
 
     let map_x = |m: u16| -> u16 {
         let w = help.width as u32;
