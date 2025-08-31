@@ -80,3 +80,11 @@ pub fn weekday_short_en(ymd: u32) -> &'static str {
         chrono::Weekday::Sun => "Sun",
     }
 }
+
+/// Validate a `YYYYMMDD` value.
+pub fn is_valid_ymd(ymd: u32) -> bool {
+    let y = (ymd / 10000) as i32;
+    let m = ymd / 100 % 100;
+    let d = ymd % 100;
+    NaiveDate::from_ymd_opt(y, m, d).is_some()
+}

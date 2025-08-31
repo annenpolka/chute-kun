@@ -436,13 +436,23 @@ impl App {
                     }
                     KeyCode::Char('.') => {
                         if let Some(t) = self.day.tasks.get_mut(self.selected) {
-                            t.planned_ymd = crate::date::add_days_to_ymd(t.planned_ymd, 1);
+                            let base = if crate::date::is_valid_ymd(t.planned_ymd) {
+                                t.planned_ymd
+                            } else {
+                                today_ymd()
+                            };
+                            t.planned_ymd = crate::date::add_days_to_ymd(base, 1);
                         }
                     }
                     KeyCode::Char(',') => {
                         if let Some(t) = self.day.tasks.get_mut(self.selected) {
                             let today = today_ymd();
-                            let cand = crate::date::add_days_to_ymd(t.planned_ymd, -1);
+                            let base = if crate::date::is_valid_ymd(t.planned_ymd) {
+                                t.planned_ymd
+                            } else {
+                                today
+                            };
+                            let cand = crate::date::add_days_to_ymd(base, -1);
                             t.planned_ymd = cand.max(today);
                         }
                     }
@@ -542,6 +552,12 @@ impl App {
             KeyCode::Char('e') => {
                 // Open estimate edit mode
                 if !self.day.tasks.is_empty() {
+                    // Backfill missing planned date on legacy tasks to avoid panics in date ops
+                    if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                        if !crate::date::is_valid_ymd(t.planned_ymd) {
+                            t.planned_ymd = today_ymd();
+                        }
+                    }
                     self.input =
                         Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
@@ -718,6 +734,11 @@ impl App {
                 let idx = self.index_from_list_row(ev.row, list);
                 self.selected = idx;
                 if !self.day.tasks.is_empty() {
+                    if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                        if !crate::date::is_valid_ymd(t.planned_ymd) {
+                            t.planned_ymd = today_ymd();
+                        }
+                    }
                     self.input =
                         Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
