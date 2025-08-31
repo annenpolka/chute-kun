@@ -12,6 +12,7 @@ Interaction
 - Keyboard: Left/Right/Down/Up/j/k adjust by ±5m; Enter confirms; Esc cancels.
 - Mouse: click or drag on the track to set minutes; click OK to confirm, Cancel to abort.
 - Range/step: 0–240 minutes, step 5 (configurable in a future ADR).
+ - Help Line: while the estimate popup is open, the bottom help shows only estimate-related hints (OK/Cancel, ±5m, ±1 day, slider/date clicks).
 
 Visuals
 - One‑line slider rendered as [====●····] with colored segments.
@@ -24,4 +25,3 @@ Notes
 
 Testing
 - See tests: app_estimate_slider_drag_test.rs, app_new_task_estimate_drag_test.rs.
-

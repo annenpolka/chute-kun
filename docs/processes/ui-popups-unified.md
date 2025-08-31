@@ -31,11 +31,21 @@ Rendering Rules
 - The main content (task table or empty hint) does not change while popups are shown.
 - Date line displays one of `Today (Wed)`, `Tomorrow (Thu)`, or `YYYY-MM-DD (Fri)`. Operation hints live in the help line, not inside the popup.
 
+Help Line (scoped)
+- While a popup is open, the bottom help shows only the hints relevant to that popup (context-specific), hiding unrelated global actions.
+  - Confirm Delete: `Enter/y: delete`, `Esc/n: cancel`.
+  - Estimate Edit: `Enter: OK`, `Esc: cancel`, `←/→/j/k: ±5m`, `.,: ±1 day`, `click slider`, `click < >`.
+  - New Task Estimate: `Enter: add`, `Esc: cancel`, `.,: ±1 day`, `click slider`, `click < >`.
+  - Command Palette: `Enter: run`, `Esc: cancel`, `type/backspace: edit`.
+  - Title Input (New/Interrupt): `Enter: next`, `Esc: cancel`, `type/backspace: edit`.
+- When no popup is open, the help shows the view-aware general shortcuts (navigation, start/pause, finish, reorder, etc.).
+
 Tests (authoritative examples)
 - Command popup mouse E2E: `tests/app_command_popup_mouse_buttons_test.rs`.
 - Delete popup mouse E2E: `tests/app_delete_popup_mouse_buttons_test.rs`.
 - Estimate editor/new-task estimate: `tests/ui_estimate_stepper_test.rs`, `tests/app_new_task_estimate_drag_test.rs`.
 - Main list stays during delete confirm: `tests/ui_delete_prompt_test.rs`.
+ - Popup-scoped help behavior: `tests/ui_help_popup_scoped_test.rs`.
 
 Related Modules
 - `src/lib/ui.rs`: popup geometry helpers and overlay renderers.
