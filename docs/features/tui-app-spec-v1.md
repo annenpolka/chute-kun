@@ -46,6 +46,7 @@
 - 複数割り当ては `/` 区切りで表示: 例）`finish_active = ["Shift+Enter", "f"]` → `Shift+Enter/f: finish`。
 - Delete もコンフィグ可能（例: `delete = "Ctrl+d"` → `Ctrl+d: delete`）。
 - `BackTab` はヘルプ上は `Shift+Tab` として表示されます。設定は `BackTab`/`Shift+Tab` のどちらでも可。
+ - ポップアップ表示中は、そのポップアップの操作に関係するヘルプのみを表示し、一般操作は一時的に非表示にします（例: 削除確認中は `Enter/y: delete` と `Esc/n: cancel` のみ）。
 
 ## 状態遷移（タスク）
 - `planned → (start) → active → (pause) → paused → (resume) → active → (finish) → done`

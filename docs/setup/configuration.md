@@ -55,6 +55,7 @@ select_down = ["Down", "j"]
 - 画面下部のヘルプは `keys` セクションの設定をそのまま表示に反映します。
   - 複数割り当ては `/` 区切り（例: `Shift+Enter/f: finish`）。
   - 修飾キーは `Shift`/`Ctrl`/`Alt` の順で表示。
+- ポップアップ表示中は、当該操作に関係するヘルプのみを表示し、一般操作（開始/並べ替え/ビュー切替など）は一時的に非表示になります。
 - `Ctrl+<letter>` は設定の大文字小文字を区別せず、表示は小文字（例: `Ctrl+d`）。
 - `BackTab` は表示上 `Shift+Tab` としてレンダリングされます（設定では `BackTab` と `Shift+Tab` のどちらも指定可能）。
 - Delete も `keys.delete` で変更可能（例: `delete = "Ctrl+d"`）。

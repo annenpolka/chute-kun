@@ -853,6 +853,45 @@ pub fn format_help_line_for(app: &App) -> String {
 /// Build help items depending on the current view. Used for wrapping.
 pub fn help_items_for(app: &App) -> Vec<String> {
     use crate::config::join_key_labels as join;
+    // Popup‑scoped help: when a popup is open, restrict to its operations only.
+    if app.is_confirm_delete() {
+        return vec!["Enter/y: delete".to_string(), "Esc/n: cancel".to_string()];
+    }
+    if app.is_estimate_editing() {
+        return vec![
+            "Enter: OK".to_string(),
+            "Esc: cancel".to_string(),
+            "Left/Right/Up/Down/j/k: +/-5m".to_string(),
+            ".,: +/-1 day".to_string(),
+            "click slider: set estimate".to_string(),
+            "click < >: date".to_string(),
+        ];
+    }
+    if app.is_new_task_estimate() {
+        return vec![
+            "Enter: add".to_string(),
+            "Esc: cancel".to_string(),
+            ".,: +/-1 day".to_string(),
+            "click slider: set estimate".to_string(),
+            "click < >: date".to_string(),
+        ];
+    }
+    if app.is_command_mode() {
+        return vec![
+            "Enter: run".to_string(),
+            "Esc: cancel".to_string(),
+            "type/backspace: edit".to_string(),
+        ];
+    }
+    if app.is_text_input_mode() {
+        return vec![
+            "Enter: next".to_string(),
+            "Esc: cancel".to_string(),
+            "type/backspace: edit".to_string(),
+        ];
+    }
+
+    // Default (no popup): view‑aware general help
     let km = &app.config.keys;
     let mut items: Vec<String> =
         vec![format!("{}: quit", join(&km.quit)), format!("{}: switch view", join(&km.view_next))];
@@ -890,12 +929,6 @@ pub fn help_items_for(app: &App) -> Vec<String> {
                 items.push(format!("{}/{}", d, u));
             } else {
                 items.push("j/k".to_string());
-            }
-            // Date picker hints only while date popups are open
-            if app.is_estimate_editing() || app.is_new_task_estimate() {
-                items.push(".: +1 day".to_string());
-                items.push(",: -1 day".to_string());
-                items.push("click < >: date".to_string());
             }
         }
         View::Past => {
