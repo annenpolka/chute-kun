@@ -1,10 +1,10 @@
 # Toggl Track Sync — Design v1 (proposal)
 
-Status: draft (research-backed). Scope is an initial, minimal, push‑only sync from Chute_kun to Toggl Track.
+Status: draft (research-backed). Scope is an initial, minimal, push‑only sync from Chute-kun to Toggl Track.
 
 ## Goals
-- Record each Chute_kun session as a Toggl Track Time Entry.
-- Keep Chute_kun as the source of truth for task structure; Toggl holds the time log.
+- Record each Chute-kun session as a Toggl Track Time Entry.
+- Keep Chute-kun as the source of truth for task structure; Toggl holds the time log.
 - Be resilient to being offline; reconcile later.
 
 Non‑goals (v1)
@@ -13,7 +13,7 @@ Non‑goals (v1)
 
 ## Data Model Mapping
 
-Chute_kun domain (current):
+Chute-kun domain (current):
 - `Task { title, estimate_min, actual_min, actual_carry_sec, started_at_min, finished_at_min, sessions: Vec<Session>, state, done_ymd }`
 - `Session { start_min: u16, end_min: Option<u16> }` (minutes since local midnight)
 - `DayPlan { tasks: Vec<Task> }` per day; storage snapshot splits `today` / `future` / `past`.
@@ -29,10 +29,10 @@ Mapping (1 session ↔ 1 time entry)
 - Optional: default `project_id`/`tags` via environment
 
 Notes
-- Chute_kun tracks minutes; Toggl stores seconds. For backfills we compute `duration = (end_min - start_min) * 60`. We ignore `actual_carry_sec` granularity per session in v1 (can refine later).
+- Chute-kun tracks minutes; Toggl stores seconds. For backfills we compute `duration = (end_min - start_min) * 60`. We ignore `actual_carry_sec` granularity per session in v1 (can refine later).
 
 ## API Usage (Track API v9)
-- Create running entry: `POST /workspaces/{wid}/time_entries` with `{ description, start, duration: -1, created_with: "chute_kun" }`.
+- Create running entry: `POST /workspaces/{wid}/time_entries` with `{ description, start, duration: -1, created_with: "chute-kun" }`.
 - Stop running entry: `PATCH /workspaces/{wid}/time_entries/{id}/stop`.
 - Update fixed entry: `PATCH /workspaces/{wid}/time_entries/{id}` (for retroactive sessions).
 - Discover IDs: `GET /me` → `default_workspace_id`. Optionally list `projects`/`tags`.
@@ -91,4 +91,3 @@ Rate Limiting
 - Two‑way sync and conflict resolution.
 - Rich mapping (projects/tags by title prefix or rules).
 - Session‑level seconds tracking in the domain model.
-

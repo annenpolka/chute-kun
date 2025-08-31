@@ -561,7 +561,7 @@ impl Config {
     /// Render a default TOML string users can customize.
     pub fn default_toml() -> String {
         // Keep keys aligned with KeyMap::default()
-        r##"# Chute_kun configuration
+        r##"# Chute-kun configuration
 # 設定ファイルの場所: $XDG_CONFIG_HOME/chute_kun/config.toml （なければ ~/.config/chute_kun/config.toml）
 
 # 1日の開始時刻（固定表示）。"HH:MM" 形式。既定は 09:00。

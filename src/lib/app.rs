@@ -364,7 +364,7 @@ impl App {
     pub fn with_config(config: Config) -> Self {
         let ymd = today_ymd();
         Self {
-            title: "Chute_kun".to_string(),
+            title: "Chute-kun".to_string(),
             should_quit: false,
             day: DayPlan::new(vec![]),
             selected: 0,

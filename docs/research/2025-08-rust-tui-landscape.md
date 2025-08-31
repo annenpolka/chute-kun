@@ -89,7 +89,7 @@ fn main() -> anyhow::Result<()> {
     loop {
         terminal.draw(|f| {
             let size = f.size();
-            let block = Block::default().title("Chute_kun").borders(Borders::ALL);
+            let block = Block::default().title("Chute-kun").borders(Borders::ALL);
             f.render_widget(block, size);
         })?;
         if event::poll(std::time::Duration::from_millis(100))? {

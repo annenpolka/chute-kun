@@ -12,7 +12,7 @@
 - 複数割当は配列で指定。
 
 ```
-# Chute_kun configuration
+# Chute-kun configuration
 # 設定ファイルの場所: $XDG_CONFIG_HOME/chute_kun/config.toml （なければ ~/.config/chute_kun/config.toml）
 
 day_start = "09:00"

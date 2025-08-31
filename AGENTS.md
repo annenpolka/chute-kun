@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-This guide explains how to contribute to the Chute_kun repository (TaskChute + Todoist CLI/TUI). Keep changes small, documented, and test‑driven. Documentation in `docs/` is authoritative.
+This guide explains how to contribute to the Chute-kun repository (TaskChute + Todoist CLI/TUI). Keep changes small, documented, and test‑driven. Documentation in `docs/` is authoritative.
 
 ## TDD Approach
 - Follow t_wada’s Red → Green → Refactor. Start with a failing, executable test; make it pass minimally; refactor while keeping tests green. See `docs/adr/ADR-002-TDD-Development-Approach.md` and `docs/processes/development-workflow.md`.
