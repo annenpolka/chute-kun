@@ -1,6 +1,7 @@
 use chute_kun::{app::App, task::Category, ui};
 use ratatui::{backend::TestBackend, layout::Rect, style::Color, Terminal};
 
+#[allow(dead_code)]
 fn buffer_to_strings(buf: &ratatui::buffer::Buffer) -> Vec<String> {
     let mut out = Vec::new();
     for y in 0..buf.area.height {
@@ -14,25 +15,17 @@ fn buffer_to_strings(buf: &ratatui::buffer::Buffer) -> Vec<String> {
 }
 
 fn find_row_y_containing(buf: &ratatui::buffer::Buffer, needle: &str) -> Option<u16> {
-    for y in 0..buf.area.height {
+    (0..buf.area.height).find(|&y| {
         let mut s = String::new();
         for x in 0..buf.area.width {
             s.push_str(buf[(x, y)].symbol());
         }
-        if s.contains(needle) {
-            return Some(y);
-        }
-    }
-    None
+        s.contains(needle)
+    })
 }
 
 fn find_char_x_in_row(buf: &ratatui::buffer::Buffer, y: u16, ch: char) -> Option<u16> {
-    for x in 0..buf.area.width {
-        if buf[(x, y)].symbol() == ch.to_string() {
-            return Some(x);
-        }
-    }
-    None
+    (0..buf.area.width).find(|&x| buf[(x, y)].symbol() == ch.to_string())
 }
 
 fn cell_at(buf: &ratatui::buffer::Buffer, x: u16, y: u16) -> &ratatui::buffer::Cell {

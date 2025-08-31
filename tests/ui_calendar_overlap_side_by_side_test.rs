@@ -5,7 +5,7 @@ fn cell(buf: &ratatui::buffer::Buffer, x: u16, y: u16) -> &ratatui::buffer::Cell
     &buf[(x, y)]
 }
 
-fn find_row_with_both<'a>(buf: &'a ratatui::buffer::Buffer, a: char, b: char) -> Option<u16> {
+fn find_row_with_both(buf: &ratatui::buffer::Buffer, a: char, b: char) -> Option<u16> {
     for y in 0..buf.area.height {
         let mut has_a = false;
         let mut has_b = false;
@@ -76,5 +76,5 @@ fn overlapping_actual_sessions_render_side_by_side_columns() {
         .expect("B not in act lane");
 
     // Expect that the two titles are placed in different horizontal regions (columns)
-    assert!((xa as i32 - xb as i32).abs() as u16 >= 2, "titles should not overlap horizontally");
+    assert!((xa as i32 - xb as i32).unsigned_abs() >= 2, "titles should not overlap horizontally");
 }
