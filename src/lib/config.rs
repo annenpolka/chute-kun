@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::style::Color;
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -12,11 +13,62 @@ use std::path::PathBuf;
 pub struct Config {
     pub day_start_minutes: u16,
     pub keys: KeyMap,
+    pub categories: CategoryTheme,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { day_start_minutes: 9 * 60, keys: KeyMap::default() }
+        Self {
+            day_start_minutes: 9 * 60,
+            keys: KeyMap::default(),
+            categories: CategoryTheme::default(),
+        }
+    }
+}
+
+// ---- Category theme (names + colors) ----
+
+#[derive(Debug, Clone)]
+pub struct CategoryTheme {
+    pub general: CategoryStyle,
+    pub work: CategoryStyle,
+    pub home: CategoryStyle,
+    pub hobby: CategoryStyle,
+}
+
+#[derive(Debug, Clone)]
+pub struct CategoryStyle {
+    pub name: String,
+    pub color: Color,
+}
+
+impl Default for CategoryTheme {
+    fn default() -> Self {
+        CategoryTheme {
+            general: CategoryStyle { name: "General".into(), color: Color::White },
+            work: CategoryStyle { name: "Work".into(), color: Color::Blue },
+            home: CategoryStyle { name: "Home".into(), color: Color::Yellow },
+            hobby: CategoryStyle { name: "Hobby".into(), color: Color::Magenta },
+        }
+    }
+}
+
+impl Config {
+    pub fn category_color(&self, cat: crate::task::Category) -> Color {
+        match cat {
+            crate::task::Category::General => self.categories.general.color,
+            crate::task::Category::Work => self.categories.work.color,
+            crate::task::Category::Home => self.categories.home.color,
+            crate::task::Category::Hobby => self.categories.hobby.color,
+        }
+    }
+    pub fn category_name(&self, cat: crate::task::Category) -> String {
+        match cat {
+            crate::task::Category::General => self.categories.general.name.clone(),
+            crate::task::Category::Work => self.categories.work.name.clone(),
+            crate::task::Category::Home => self.categories.home.name.clone(),
+            crate::task::Category::Hobby => self.categories.hobby.name.clone(),
+        }
     }
 }
 
@@ -281,6 +333,8 @@ struct RawConfig {
     day_start: Option<String>,
     #[serde(default)]
     keys: Option<RawKeys>,
+    #[serde(default)]
+    categories: Option<RawCategories>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -304,6 +358,26 @@ struct RawKeys {
     toggle_blocks: Option<OneOrMany>,
     category_cycle: Option<OneOrMany>,
     category_picker: Option<OneOrMany>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawCategories {
+    #[serde(default)]
+    general: Option<RawCategoryStyle>,
+    #[serde(default)]
+    work: Option<RawCategoryStyle>,
+    #[serde(default)]
+    home: Option<RawCategoryStyle>,
+    #[serde(default)]
+    hobby: Option<RawCategoryStyle>,
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+struct RawCategoryStyle {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    color: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -330,6 +404,34 @@ fn parse_hhmm_to_minutes(s: &str) -> Result<u16> {
     let h: u16 = parts[0].parse().context("invalid hour")?;
     let m: u16 = parts[1].parse().context("invalid minute")?;
     Ok((h % 24) * 60 + (m % 60))
+}
+
+fn parse_color(s: &str) -> Result<Color> {
+    let lower = s.trim().to_ascii_lowercase();
+    let named = match lower.as_str() {
+        "white" => Some(Color::White),
+        "blue" => Some(Color::Blue),
+        "yellow" => Some(Color::Yellow),
+        "magenta" => Some(Color::Magenta),
+        "red" => Some(Color::Red),
+        "green" => Some(Color::Green),
+        "cyan" => Some(Color::Cyan),
+        "black" => Some(Color::Black),
+        "gray" | "grey" => Some(Color::Gray),
+        "darkgray" | "darkgrey" => Some(Color::DarkGray),
+        _ => None,
+    };
+    if let Some(c) = named {
+        return Ok(c);
+    }
+    let s = lower.trim();
+    if s.starts_with('#') && s.len() == 7 {
+        let r = u8::from_str_radix(&s[1..3], 16).map_err(|_| anyhow!("bad hex color"))?;
+        let g = u8::from_str_radix(&s[3..5], 16).map_err(|_| anyhow!("bad hex color"))?;
+        let b = u8::from_str_radix(&s[5..7], 16).map_err(|_| anyhow!("bad hex color"))?;
+        return Ok(Color::Rgb(r, g, b));
+    }
+    Err(anyhow!("unknown color: {}", s))
 }
 
 impl Config {
@@ -408,6 +510,23 @@ impl Config {
             }
             cfg.keys = km;
         }
+        if let Some(cats) = raw.categories {
+            let apply = |dst: &mut CategoryStyle, ent: Option<RawCategoryStyle>| -> Result<()> {
+                if let Some(e) = ent {
+                    if let Some(n) = e.name {
+                        dst.name = n;
+                    }
+                    if let Some(c) = e.color {
+                        dst.color = parse_color(&c)?;
+                    }
+                }
+                Ok(())
+            };
+            apply(&mut cfg.categories.general, cats.general)?;
+            apply(&mut cfg.categories.work, cats.work)?;
+            apply(&mut cfg.categories.home, cats.home)?;
+            apply(&mut cfg.categories.hobby, cats.hobby)?;
+        }
         Ok(cfg)
     }
 
@@ -442,7 +561,7 @@ impl Config {
     /// Render a default TOML string users can customize.
     pub fn default_toml() -> String {
         // Keep keys aligned with KeyMap::default()
-        r#"# Chute_kun configuration
+        r##"# Chute_kun configuration
 # 設定ファイルの場所: $XDG_CONFIG_HOME/chute_kun/config.toml （なければ ~/.config/chute_kun/config.toml）
 
 # 1日の開始時刻（固定表示）。"HH:MM" 形式。既定は 09:00。
@@ -469,7 +588,25 @@ select_down = ["Down", "j"]
 toggle_blocks = "t"
 category_cycle = "c"
 category_picker = "Shift+c"
-"#.to_string()
+
+[categories]
+# カテゴリ名と色（"white"/"blue"/"yellow"/"magenta"/"red"/"green"/"cyan"/"black"/"gray"/"darkgray" または "#RRGGBB"）
+[categories.general]
+name = "General"
+color = "white"
+
+[categories.work]
+name = "Work"
+color = "blue"
+
+[categories.home]
+name = "Home"
+color = "yellow"
+
+[categories.hobby]
+name = "Hobby"
+color = "magenta"
+"##.to_string()
     }
 
     /// Write a default config file to the resolved path.
