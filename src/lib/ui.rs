@@ -1883,7 +1883,8 @@ pub fn compute_layout(app: &App, area: Rect) -> (Rect, Option<Rect>, Rect, Rect)
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    help_height = help_height.max(1);
+    // Ensure at least two lines for gauge+help when space allows; otherwise keep at least one
+    help_height = if max_help >= 2 { help_height.max(2) } else { help_height.max(1) };
     let tabs = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
     let mut y = inner.y + 1;
     let banner = if has_banner {
