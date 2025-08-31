@@ -9,7 +9,7 @@ fn task_line_shows_seconds_while_paused() {
     app.handle_key(KeyCode::Enter); // start A
 
     app.tick(59); // 59sec elapsed
-    app.handle_key(KeyCode::Char(' ')); // pause
+    app.handle_key(KeyCode::Enter); // pause (toggle)
 
     let lines = ui::format_task_lines(&app);
     let row = lines.iter().find(|l| l.contains("A")).expect("row for A");

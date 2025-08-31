@@ -77,6 +77,7 @@ enum InputKind {
     NewTaskEstimate,
     ConfirmDelete,
     CategoryPicker,
+    QuickPopup,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -538,6 +539,12 @@ impl App {
                         self.input = None;
                     }
                     KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                        self.input = None;
+                    }
+                    _ => {}
+                },
+                InputKind::QuickPopup => match code {
+                    KeyCode::Enter | KeyCode::Esc => {
                         self.input = None;
                     }
                     _ => {}
@@ -1113,14 +1120,8 @@ impl App {
                 // Now defined as "finish selected"
                 self.finish_selected();
             }
-            A::Pause => {
-                if let Some(idx) = self.day.active_index() {
-                    let now = crate::clock::system_now_minutes();
-                    if let Some(t) = self.day.tasks.get_mut(idx) {
-                        t.end_session(now);
-                    }
-                }
-                self.day.pause_active();
+            A::OpenPopup => {
+                self.input = Some(Input { kind: InputKind::QuickPopup, buffer: String::new() });
             }
             A::Delete => {
                 if self.view == View::Today && !self.day.tasks.is_empty() {
@@ -1270,6 +1271,9 @@ impl App {
     }
     pub fn is_category_picker(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::CategoryPicker))
+    }
+    pub fn is_quick_popup(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::QuickPopup))
     }
     /// True only when typing a task title (Normal/Interrupt), not for estimate/confirm popups.
     pub fn is_text_input_mode(&self) -> bool {
@@ -1491,6 +1495,23 @@ impl App {
                     if let Ok(v) = num_part.parse::<u16>() {
                         if let Some(t) = self.day.tasks.get_mut(self.selected) {
                             t.estimate_min = v;
+                        }
+                    }
+                }
+            }
+            "at" => {
+                if let Some(arg) = it.next() {
+                    if arg == "-"
+                        || arg.eq_ignore_ascii_case("none")
+                        || arg.eq_ignore_ascii_case("clear")
+                    {
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            t.fixed_start_min = None;
+                        }
+                    } else if let Ok((h, m)) = crate::config::parse_hhmm_or_compact(arg) {
+                        let minutes = h * 60 + m;
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            t.fixed_start_min = Some(minutes);
                         }
                     }
                 }

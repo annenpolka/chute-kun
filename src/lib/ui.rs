@@ -161,6 +161,21 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
     }
 
+    // Overlay: simple quick popup bound to Space
+    if let Some(popup) = compute_quick_popup_rect(app, area) {
+        let border = Style::default().fg(Color::Cyan);
+        let title_line =
+            Line::from(Span::styled(" Quick Menu ", border.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner = block.inner(popup);
+        let text = "Press Enter/Esc to close";
+        let para = Paragraph::new(Span::styled(text, border));
+        let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+        f.render_widget(para, msg_rect);
+    }
+
     // Overlay: centered input popup (styled buttons)
     if let Some(popup) = compute_input_popup_rect(app, area) {
         let border = Style::default().fg(Color::Cyan);
@@ -490,6 +505,20 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         let para = Paragraph::new(Span::styled(msg.clone(), Style::default().fg(Color::Red)));
         f.render_widget(para, inner_popup);
     }
+    // Overlay: quick popup with injected clock path as well
+    if let Some(popup) = compute_quick_popup_rect(app, area) {
+        let border = Style::default().fg(Color::Cyan);
+        let title_line =
+            Line::from(Span::styled(" Quick Menu ", border.add_modifier(Modifier::BOLD)));
+        let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
+        f.render_widget(Clear, popup);
+        f.render_widget(block.clone(), popup);
+        let inner = block.inner(popup);
+        let text = "Press Enter/Esc to close";
+        let para = Paragraph::new(Span::styled(text, border));
+        let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
+        f.render_widget(para, msg_rect);
+    }
 }
 
 // Tab metadata for the date views (Past/Today/Future).
@@ -518,25 +547,32 @@ pub fn format_task_lines_at(now_min: u16, app: &App) -> Vec<String> {
     }
 }
 
+/// Compute planned start minutes for each task, respecting per-task fixed start times.
+/// Algorithm:
+/// - `cursor` starts at `now_min` (typically day_start)
+/// - For each task in order: if it has `fixed_start_min`, set `cursor = max(cursor, fixed)`.
+///   The task's start is `cursor`; then advance `cursor += estimate_min`.
+fn compute_planned_starts(now_min: u16, tasks: &[crate::task::Task]) -> Vec<u16> {
+    let mut cursor = now_min;
+    let mut out: Vec<u16> = Vec::with_capacity(tasks.len());
+    for t in tasks.iter() {
+        if let Some(fs) = t.fixed_start_min {
+            cursor = cursor.max(fs);
+        }
+        out.push(cursor);
+        cursor = cursor.saturating_add(t.estimate_min);
+    }
+    out
+}
+
 fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Vec<String> {
     if tasks.is_empty() {
         return vec!["No tasks — press 'i' to add".to_string()];
     }
     // active index not needed for seconds rendering anymore (per-task seconds)
 
-    // Build schedule start times from `now_min`, adding durations of preceding tasks.
-    // ポイント: Done(完了) タスクも「見積時間(estimate_min)」で次以降のPlanを押し出す。
-    let mut cursor = now_min;
-    let starts: Vec<u16> = tasks
-        .iter()
-        .map(|t| {
-            let this = cursor;
-            // PlanはACTに影響されない: 常に見積(estimate)で次の開始時刻を押し出す
-            let delta = t.estimate_min;
-            cursor = cursor.saturating_add(delta);
-            this
-        })
-        .collect();
+    // Build schedule start times considering per-task fixed start time.
+    let starts: Vec<u16> = compute_planned_starts(now_min, tasks);
 
     tasks
         .iter()
@@ -596,17 +632,7 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
     // If empty, show the hint paragraph to save space
     let mut rows: Vec<Row> = Vec::new();
     // Build schedule start times similar to `render_list_slice`
-    let mut cursor = now_min;
-    let starts: Vec<u16> = tasks_slice
-        .iter()
-        .map(|t| {
-            let this = cursor;
-            // Planは常に見積ベース。経過ACTで短縮しない。
-            let delta = t.estimate_min;
-            cursor = cursor.saturating_add(delta);
-            this
-        })
-        .collect();
+    let starts: Vec<u16> = compute_planned_starts(now_min, tasks_slice);
 
     let selected = app.selected_index().min(tasks_slice.len().saturating_sub(1));
     let hovered = app.hovered_index();
@@ -616,7 +642,10 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
     for (i, t) in tasks_slice.iter().enumerate() {
         let hh = (starts[i] / 60) % 24;
         let mm = starts[i] % 60;
-        let planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
+        let mut planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
+        if t.fixed_start_min.is_some() {
+            planned_cell = planned_cell.style(Style::default().fg(Color::Cyan));
+        }
         let actual_cell = Cell::from(format_actual_last_finish_time(t));
         // Title cell with colored state icon and plain title (estimate is a dedicated column)
         let mut spans: Vec<Span> = Vec::new();
@@ -940,7 +969,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: pause | i: interrupt | p: postpone | x: delete | b: bring | [: up | ]: down | e: edit | j/k";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: popup | i: interrupt | p: postpone | x: delete | b: bring | [: up | ]: down | e: edit | j/k";
     format!("{} | {}", nav, task)
 }
 
@@ -959,6 +988,9 @@ pub fn help_items_for(app: &App) -> Vec<String> {
     // Popup‑scoped help: when a popup is open, restrict to its operations only.
     if app.is_confirm_delete() {
         return vec!["Enter/y: delete".to_string(), "Esc/n: cancel".to_string()];
+    }
+    if app.is_quick_popup() {
+        return vec!["Enter: close".to_string(), "Esc: close".to_string()];
     }
     if app.is_estimate_editing() {
         return vec![
@@ -1001,7 +1033,7 @@ pub fn help_items_for(app: &App) -> Vec<String> {
     match app.view() {
         View::Today => {
             items.push(format!("{}: start/pause", join(&km.start_or_resume)));
-            items.push(format!("{}: pause", join(&km.pause)));
+            items.push(format!("{}: popup", join(&km.popup)));
             items.push(format!("{}: finish", join(&km.finish_active)));
             // Interrupt: reflect configured keys
             items.push(format!("{}: interrupt", join(&km.add_interrupt)));
@@ -1398,6 +1430,24 @@ pub fn date_picker_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
     (prev, label_rect, next)
 }
 
+// Simple quick popup geometry
+pub fn compute_quick_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_quick_popup() {
+        return None;
+    }
+    let inner = Block::default().borders(Borders::ALL).inner(area);
+    if inner.width < 20 || inner.height < 3 {
+        return None;
+    }
+    let content = "Press Enter/Esc to close";
+    let content_w = UnicodeWidthStr::width(content) as u16;
+    let popup_w = content_w.saturating_add(6).min(inner.width).max(22).min(inner.width);
+    let popup_h: u16 = 3;
+    let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
+    let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
+    Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
 fn render_date_line(f: &mut Frame, app: &App, popup: Rect, inner: Rect, color: Color, ymd: u32) {
     let (prev, label_rect, next) = date_picker_hitboxes(app, popup);
     let date_label = date_label_for(ymd);
@@ -1550,9 +1600,12 @@ fn render_calendar_day_at(
     }
     let start_min = app_display_base(app);
     // Planned end accumulates estimates sequentially from day start
-    let mut cur = start_min;
     let mut planned_ranges: Vec<(u16, u16, String)> = Vec::new();
+    let mut cur = start_min;
     for t in tasks.iter() {
+        if let Some(fs) = t.fixed_start_min {
+            cur = cur.max(fs);
+        }
         let s = cur;
         let e = cur.saturating_add(t.estimate_min);
         planned_ranges.push((s, e, t.title.clone()));

@@ -23,7 +23,7 @@ add_task = "i"
 add_interrupt = "I"
 start_or_resume = "Enter"
 finish_active = ["Shift+Enter", "f"]
-pause = "Space"
+popup = "Space"
 delete = "x"
 reorder_up = "["
 reorder_down = "]"
@@ -50,6 +50,7 @@ select_down = ["Down", "j"]
 **注意**
 - 入力モード中の文字入力はテキスト編集が優先され、カスタムキーは適用されません（Enter/Esc/Backspace/文字）。
 - `Shift+Enter` と `Enter` のように修飾の有無は区別されます。
+- 一時停止は Enter のトグル（start/pause）に統一しました。Space はクイックポップアップを開く既定キーです。
 
 **ヘルプ行への反映**
 - 画面下部のヘルプは `keys` セクションの設定をそのまま表示に反映します。
