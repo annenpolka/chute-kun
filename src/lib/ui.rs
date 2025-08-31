@@ -8,6 +8,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::{App, DisplayMode, View};
 use crate::clock::Clock;
 use crate::task::TaskState;
+use crate::task::Category as TaskCategory;
 
 // Theme: darker list highlights for better contrast with default light (white) text.
 // These colors aim to keep contrast acceptable on common terminals while avoiding
@@ -367,13 +368,10 @@ pub fn draw(f: &mut Frame, app: &App) {
         // Inner box for list
         let inner = Rect { x: popup.x, y: popup.y, width: popup.width, height: popup.height };
         let mut rows: Vec<Row> = Vec::new();
-        let options = category_options();
+        let options = category_options(app);
         for (i, (label, color, _cat)) in options.iter().enumerate() {
             let bullet = Span::styled("●".to_string(), Style::default().fg(*color));
-            let text = Span::styled(
-                (*label).to_string(),
-                Style::default().fg(*color).add_modifier(Modifier::BOLD),
-            );
+            let text = Span::styled(label.clone(), Style::default().fg(*color).add_modifier(Modifier::BOLD));
             let line = Line::from(vec![bullet, Span::raw(" "), text]);
             let mut row = Row::new(vec![Cell::from(line)]);
             if app.category_pick_index() == i {
@@ -633,13 +631,8 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         }
         spans.push(state_icon_span(t.state));
         spans.push(Span::raw(" "));
-        // Category colored dot
-        let cat_color = match t.category {
-            crate::task::Category::General => Color::White,
-            crate::task::Category::Work => Color::Blue,
-            crate::task::Category::Home => Color::Yellow,
-            crate::task::Category::Hobby => Color::Magenta,
-        };
+        // Category colored dot (configurable)
+        let cat_color = app.config.category_color(t.category);
         spans.push(Span::styled("●".to_string(), Style::default().fg(cat_color)));
         spans.push(Span::raw(" "));
         // Title color: by category; Done overrides to gray. Keep strikethrough for Done.
@@ -655,6 +648,7 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         // New dedicated estimate column
         let est_cell = Cell::from(format!("{}m", t.estimate_min));
         // New dedicated accumulated time column with seconds
+        // Show seconds while Active or Paused
         let secs = if matches!(t.state, TaskState::Active | TaskState::Paused) {
             t.actual_carry_sec
         } else {
@@ -784,12 +778,28 @@ pub fn header_title_line(now_min: u16, app: &App) -> Line<'static> {
 
 // ---- Category picker UI helpers ----
 
-pub fn category_options() -> Vec<(&'static str, Color, crate::task::Category)> {
+pub fn category_options(app: &App) -> Vec<(String, Color, crate::task::Category)> {
     vec![
-        ("General", Color::White, crate::task::Category::General),
-        ("Work", Color::Blue, crate::task::Category::Work),
-        ("Home", Color::Yellow, crate::task::Category::Home),
-        ("Hobby", Color::Magenta, crate::task::Category::Hobby),
+        (
+            app.config.category_name(crate::task::Category::General),
+            app.config.category_color(crate::task::Category::General),
+            crate::task::Category::General,
+        ),
+        (
+            app.config.category_name(crate::task::Category::Work),
+            app.config.category_color(crate::task::Category::Work),
+            crate::task::Category::Work,
+        ),
+        (
+            app.config.category_name(crate::task::Category::Home),
+            app.config.category_color(crate::task::Category::Home),
+            crate::task::Category::Home,
+        ),
+        (
+            app.config.category_name(crate::task::Category::Hobby),
+            app.config.category_color(crate::task::Category::Hobby),
+            crate::task::Category::Hobby,
+        ),
     ]
 }
 
@@ -798,16 +808,16 @@ pub fn compute_category_popup_rect(app: &App, area: Rect) -> Option<Rect> {
         return None;
     }
     let width: u16 = 24;
-    let height: u16 = 1 /* header */ + category_options().len() as u16 + 2; // box padding
+    let height: u16 = 1 /* header */ + category_options(app).len() as u16 + 2; // box padding
     let x = area.x + (area.width.saturating_sub(width)) / 2;
     let y = area.y + (area.height.saturating_sub(height)) / 2;
     Some(Rect { x, y, width, height })
 }
 
-pub fn category_picker_hitboxes(_app: &App, popup: Rect) -> Vec<Rect> {
+pub fn category_picker_hitboxes(app: &App, popup: Rect) -> Vec<Rect> {
     let list_y = popup.y + 2; // leave a small margin
     let mut rects = Vec::new();
-    for i in 0..category_options().len() as u16 {
+    for i in 0..category_options(app).len() as u16 {
         rects.push(Rect {
             x: popup.x + 1,
             y: list_y + i,
@@ -1551,25 +1561,27 @@ fn render_calendar_day_at(
     let start_min = app_display_base(app);
     // Planned end accumulates estimates sequentially from day start
     let mut cur = start_min;
-    let mut planned_ranges: Vec<(u16, u16, String)> = Vec::new();
+    let mut planned_ranges: Vec<(u16, u16, String, TaskCategory)> = Vec::new();
     for t in tasks.iter() {
         let s = cur;
         let e = cur.saturating_add(t.estimate_min);
-        planned_ranges.push((s, e, t.title.clone()));
+        planned_ranges.push((s, e, t.title.clone(), t.category));
         cur = e;
     }
-    let mut act_ranges: Vec<(u16, u16, String, bool)> = Vec::new();
-    for t in tasks.iter() {
+    let mut act_ranges: Vec<(usize, u16, u16, String, TaskCategory, bool)> = Vec::new();
+    for (ti, t) in tasks.iter().enumerate() {
         for s in t.sessions.iter() {
             let end = s.end_min.unwrap_or(now_min);
             let closed = s.end_min.is_some();
-            act_ranges.push((s.start_min, end, t.title.clone(), closed));
+            act_ranges.push((ti, s.start_min, end, t.title.clone(), t.category, closed));
         }
     }
+    // Hide sub-minute work on the calendar: drop zero-minute ranges (start == end)
+    act_ranges.retain(|(_ti, s, e, _title, _cat, _closed)| e > s);
     let latest = planned_ranges
         .iter()
-        .map(|&(_, e, _)| e)
-        .chain(act_ranges.iter().map(|&(_, e, _, _)| e))
+        .map(|&(_, e, _, _)| e)
+        .chain(act_ranges.iter().map(|&(_, _, e, _, _, _)| e))
         .max()
         .unwrap_or(start_min);
     let end_min = latest.max(start_min + 90); // ensure some space (≥1.5h)
@@ -1594,14 +1606,24 @@ fn render_calendar_day_at(
 
     // Prepare line-by-line strings for lanes
     let mut lines_plan: Vec<String> = vec![" ".repeat(lane_w as usize); rect.height as usize];
+    // We'll build Actual lane strings later (supports horizontal split)
     let mut lines_act: Vec<String> = vec![" ".repeat(lane_w as usize); rect.height as usize];
+    // Per-row colors derived from the category of the task covering the row (plan side)
+    let mut plan_colors: Vec<Option<Color>> = vec![None; rect.height as usize];
+    // For actual side after columnization
+    let mut act_row_color: Vec<Option<Color>> = vec![None; rect.height as usize];
 
-    for (s, e, title) in planned_ranges.into_iter() {
+    for (s, e, title, cat) in planned_ranges.into_iter() {
         let y0 = to_y(s, rect.height);
         let y1 = to_y(e, rect.height).max(y0);
+        // Resolve this block's category color directly from range
+        let this_color = app.config.category_color(cat);
         for y in y0..=y1 {
             if let Some(row) = lines_plan.get_mut(y as usize) {
                 *row = "█".repeat(lane_w as usize);
+            }
+            if let Some(slot) = plan_colors.get_mut(y as usize) {
+                *slot = Some(this_color);
             }
         }
         // Put the task title on the first row of its planned block
@@ -1617,44 +1639,127 @@ fn render_calendar_day_at(
             *row = s;
         }
     }
-    for (s, e, _title, _closed) in act_ranges.iter().cloned() {
-        let y0 = to_y(s, rect.height);
-        let y1 = to_y(e, rect.height).max(y0);
+    // ---- Actual lane with overlap split into columns ----
+    #[derive(Clone)]
+    struct Block {
+        ti: usize,
+        s: u16,
+        e: u16,
+        y0: u16,
+        y1: u16,
+        title: String,
+        cat: TaskCategory,
+        closed: bool,
+        col: usize,
+    }
+    let mut blocks_raw: Vec<Block> = act_ranges
+        .iter()
+        .cloned()
+        .map(|(ti, s, e, title, cat, closed)| {
+            let y0 = to_y(s, rect.height);
+            let y1 = to_y(e, rect.height).max(y0);
+            Block { ti, s, e, y0, y1, title, cat, closed, col: 0 }
+        })
+        .collect();
+    // Merge per-task blocks that overlap or touch visually
+    blocks_raw.sort_by_key(|b| (b.ti, b.y0, b.y1));
+    let mut blocks: Vec<Block> = Vec::new();
+    let mut k = 0usize;
+    while k < blocks_raw.len() {
+        let mut cur = blocks_raw[k].clone();
+        k += 1;
+        while k < blocks_raw.len() && blocks_raw[k].ti == cur.ti && blocks_raw[k].y0 <= cur.y1 {
+            let b = blocks_raw[k].clone();
+            cur.y1 = cur.y1.max(b.y1);
+            cur.e = cur.e.max(b.e);
+            cur.closed = cur.closed && b.closed;
+            k += 1;
+        }
+        blocks.push(cur);
+    }
+    // Assign columns greedily
+    blocks.sort_by_key(|b| b.s);
+    // Track last occupied row (y1) per column to detect visual overlap (row-level)
+    let mut col_yend: Vec<u16> = Vec::new();
+    for b in blocks.iter_mut() {
+        let mut placed = false;
+        for (ci, yend) in col_yend.iter_mut().enumerate() {
+            // Non-overlap visually when previous end row is strictly above next start row
+            if *yend < b.y0 {
+                b.col = ci;
+                *yend = b.y1;
+                placed = true;
+                break;
+            }
+        }
+        if !placed {
+            b.col = col_yend.len();
+            col_yend.push(b.y1);
+        }
+    }
+    let mut ncols = col_yend.len().max(1);
+    // Omission rule: show at most 3 columns
+    if ncols > 3 { ncols = 3; }
+    if ncols as u16 > lane_w { ncols = lane_w as usize; }
+    let base_w = (lane_w / ncols as u16).max(1);
+    let rem = (lane_w % ncols as u16) as usize;
+    let mut col_widths: Vec<u16> = (0..ncols).map(|i| base_w + if i < rem { 1 } else { 0 }).collect();
+    let mut lines_act_cols: Vec<Vec<String>> = vec![vec![String::new(); ncols]; rect.height as usize];
+    let mut act_col_colors: Vec<Vec<Option<Color>>> =
+        vec![vec![None; ncols]; rect.height as usize];
+    for y in 0..rect.height as usize {
+        for c in 0..ncols {
+            lines_act_cols[y][c] = " ".repeat(col_widths[c] as usize);
+        }
+    }
+    // Fill blocks
+    for b in blocks.iter() {
+        let col = b.col.min(ncols.saturating_sub(1));
+        let y0 = to_y(b.s, rect.height);
+        let y1 = to_y(b.e, rect.height).max(y0);
+        let cw = col_widths[col] as usize;
         for y in y0..=y1 {
-            if let Some(row) = lines_act.get_mut(y as usize) {
-                *row = "▓".repeat(lane_w as usize);
+            let yi = y as usize;
+            if let Some(cell) = lines_act_cols.get_mut(yi).and_then(|row| row.get_mut(col)) {
+                *cell = "▓".repeat(cw);
+            }
+            if let Some(slot) = act_col_colors.get_mut(yi).and_then(|row| row.get_mut(col)) {
+                if slot.is_none() {
+                    *slot = Some(app.config.category_color(b.cat));
+                }
             }
         }
     }
-
-    // Title overlays for closed sessions with overlap detection: prefer longer durations
-    let mut overlays: Vec<(u16 /*dur*/, u16 /*row*/, String)> = Vec::new();
-    for (s, e, title, closed) in act_ranges.into_iter() {
-        if closed && e <= now_min {
-            let y = to_y(s, rect.height);
-            let dur = e.saturating_sub(s);
-            overlays.push((dur, y, title));
-        }
-    }
-    overlays.sort_by(|a, b| b.0.cmp(&a.0));
-    let mut used: Vec<bool> = vec![false; rect.height as usize];
-    for (_dur, y, title) in overlays.into_iter() {
-        let yi = y.min(rect.height.saturating_sub(1)) as usize;
-        if used[yi] {
-            continue;
-        }
-        if let Some(row) = lines_act.get_mut(yi) {
-            let fitted = fit_to_width(&title, lane_w as usize);
+    // Overlay titles per column on their start rows for closed sessions
+    for b in blocks.iter() {
+        if b.closed && b.e <= now_min {
+            let y = to_y(b.s, rect.height).min(rect.height.saturating_sub(1));
+            let yi = y as usize;
+            let col = b.col.min(ncols.saturating_sub(1));
+            let cw = col_widths[col] as usize;
+            let fitted = fit_to_width(&b.title, cw);
             use unicode_width::UnicodeWidthStr as UW;
-            let w = UW::width(fitted.as_str()) as u16;
-            let mut sline = String::new();
-            sline.push_str(&fitted);
-            if w < lane_w {
-                sline.push_str(&"▓".repeat((lane_w - w) as usize));
+            let w = UW::width(fitted.as_str()) as usize;
+            if let Some(cell) = lines_act_cols.get_mut(yi).and_then(|row| row.get_mut(col)) {
+                let mut sline = String::new();
+                sline.push_str(&fitted);
+                if w < cw { sline.push_str(&"▓".repeat(cw - w)); }
+                *cell = sline;
             }
-            *row = sline;
-            used[yi] = true;
+            if let Some(slot) = act_col_colors.get_mut(yi).and_then(|row| row.get_mut(col)) {
+                if slot.is_none() {
+                    *slot = Some(app.config.category_color(b.cat));
+                }
+            }
         }
+    }
+    // Join columns per row into act strings
+    for y in 0..rect.height as usize {
+        let mut s = String::new();
+        for c in 0..ncols { s.push_str(&lines_act_cols[y][c]); }
+        let w = s.chars().count() as u16;
+        if w < lane_w { s.push_str(&" ".repeat((lane_w - w) as usize)); }
+        lines_act[y] = s;
     }
 
     // Precompute hour labels mapped to row positions to avoid missing due to discretization
@@ -1730,7 +1835,7 @@ fn render_calendar_day_at(
             if is_now_row {
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::Green)
+                Style::default().fg(plan_colors[i as usize].unwrap_or(Color::Green))
             },
         );
         let gap_span = if is_now_row {
@@ -1745,10 +1850,21 @@ fn render_calendar_day_at(
                 Style::default().fg(Color::Red)
             }
         } else {
-            Style::default().fg(Color::Magenta)
+            // Unused for per-column styles; keep default
+            Style::default()
         };
-        let act_span = Span::styled(act_cell, act_style);
-        let line = Line::from(vec![left_span, Span::raw(" "), plan_span, gap_span, act_span]);
+        let mut parts: Vec<Span> = vec![left_span, Span::raw(" "), plan_span, gap_span];
+        if is_now_row {
+            parts.push(Span::styled(act_cell, act_style));
+        } else {
+            // Build per-column styled spans
+            let yi = i as usize;
+            for (c, seg) in lines_act_cols[yi].iter().enumerate() {
+                let fg = act_col_colors[yi][c].unwrap_or(Color::Magenta);
+                parts.push(Span::styled(seg.clone(), Style::default().fg(fg)));
+            }
+        }
+        let line = Line::from(parts);
         let para = Paragraph::new(line);
         f.render_widget(para, Rect { x: rect.x, y, width: rect.width, height: 1 });
     }
