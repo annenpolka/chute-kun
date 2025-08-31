@@ -35,7 +35,7 @@ fn find_char_x_in_row(buf: &ratatui::buffer::Buffer, y: u16, ch: char) -> Option
     None
 }
 
-fn cell_at<'a>(buf: &'a ratatui::buffer::Buffer, x: u16, y: u16) -> &'a ratatui::buffer::Cell {
+fn cell_at(buf: &ratatui::buffer::Buffer, x: u16, y: u16) -> &ratatui::buffer::Cell {
     &buf[(x, y)]
 }
 
