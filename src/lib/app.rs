@@ -76,6 +76,7 @@ struct NewTaskDraft {
     source: InputKind, // Normal or Interrupt
     title: String,
     default_estimate: u16,
+    planned_ymd: u32,
 }
 
 impl App {
@@ -111,6 +112,8 @@ impl App {
             // Estimate editor (slider)
             if let Some(popup) = crate::ui::compute_estimate_popup_rect(self, area) {
                 let (track, ok, cancel) = crate::ui::estimate_slider_hitboxes(self, popup);
+                let (prev_btn, _label_rect, next_btn) =
+                    crate::ui::date_picker_hitboxes(self, popup);
                 match ev.kind {
                     MouseEventKind::Moved => {
                         let pos = (ev.column, ev.row);
@@ -118,6 +121,10 @@ impl App {
                             Some(PopupButton::EstOk)
                         } else if point_in_rect(pos.0, pos.1, cancel) {
                             Some(PopupButton::EstCancel)
+                        } else if point_in_rect(pos.0, pos.1, prev_btn) {
+                            Some(PopupButton::DatePrev)
+                        } else if point_in_rect(pos.0, pos.1, next_btn) {
+                            Some(PopupButton::DateNext)
                         } else {
                             None
                         };
@@ -129,6 +136,16 @@ impl App {
                             let m = crate::ui::minutes_from_slider_x(track, 0, 240, 5, pos.0);
                             if let Some(t) = self.day.tasks.get_mut(self.selected) {
                                 t.estimate_min = m;
+                            }
+                        } else if point_in_rect(pos.0, pos.1, prev_btn) {
+                            if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                                let today = today_ymd();
+                                let cand = crate::date::add_days_to_ymd(t.planned_ymd, -1);
+                                t.planned_ymd = cand.max(today);
+                            }
+                        } else if point_in_rect(pos.0, pos.1, next_btn) {
+                            if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                                t.planned_ymd = crate::date::add_days_to_ymd(t.planned_ymd, 1);
                             }
                         } else if point_in_rect(pos.0, pos.1, ok)
                             || point_in_rect(pos.0, pos.1, cancel)
@@ -142,6 +159,8 @@ impl App {
         } else if self.is_new_task_estimate() {
             if let Some(popup) = crate::ui::compute_new_task_estimate_popup_rect(self, area) {
                 let (add, cancel) = crate::ui::input_popup_button_hitboxes(self, popup);
+                let (prev_btn, _label_rect, next_btn) =
+                    crate::ui::date_picker_hitboxes(self, popup);
                 match ev.kind {
                     MouseEventKind::Moved => {
                         let pos = (ev.column, ev.row);
@@ -149,6 +168,10 @@ impl App {
                             Some(PopupButton::InputAdd)
                         } else if point_in_rect(pos.0, pos.1, cancel) {
                             Some(PopupButton::InputCancel)
+                        } else if point_in_rect(pos.0, pos.1, prev_btn) {
+                            Some(PopupButton::DatePrev)
+                        } else if point_in_rect(pos.0, pos.1, next_btn) {
+                            Some(PopupButton::DateNext)
                         } else {
                             None
                         };
@@ -163,6 +186,16 @@ impl App {
                             let m = crate::ui::minutes_from_slider_x(track, 0, 240, 5, pos.0);
                             if let Some(inp) = self.input.as_mut() {
                                 inp.buffer = m.to_string();
+                            }
+                        } else if point_in_rect(pos.0, pos.1, prev_btn) {
+                            if let Some(d) = self.new_task.as_mut() {
+                                let today = today_ymd();
+                                let cand = crate::date::add_days_to_ymd(d.planned_ymd, -1);
+                                d.planned_ymd = cand.max(today);
+                            }
+                        } else if point_in_rect(pos.0, pos.1, next_btn) {
+                            if let Some(d) = self.new_task.as_mut() {
+                                d.planned_ymd = crate::date::add_days_to_ymd(d.planned_ymd, 1);
                             }
                         } else if point_in_rect(pos.0, pos.1, add) {
                             self.handle_key(KeyCode::Enter);
@@ -278,8 +311,12 @@ impl App {
                             input.buffer.trim().to_string()
                         };
                         // Move to estimate entry step with default prefilled
-                        self.new_task =
-                            Some(NewTaskDraft { source: input.kind, title, default_estimate: est });
+                        self.new_task = Some(NewTaskDraft {
+                            source: input.kind,
+                            title,
+                            default_estimate: est,
+                            planned_ymd: today_ymd(),
+                        });
                         self.input =
                             Some(Input { kind: InputKind::NewTaskEstimate, buffer: String::new() });
                     }
@@ -302,8 +339,25 @@ impl App {
                                 .as_ref()
                                 .and_then(|i| i.buffer.trim().parse::<u16>().ok())
                                 .unwrap_or(draft.default_estimate);
-                            let idx = self.add_task(&draft.title, cur);
-                            self.selected = idx;
+                            let today = today_ymd();
+                            if draft.planned_ymd == today {
+                                let idx = self.add_task(&draft.title, cur);
+                                if let Some(t) = self.day.tasks.get_mut(idx) {
+                                    t.planned_ymd = draft.planned_ymd;
+                                }
+                                self.selected = idx;
+                            } else if draft.planned_ymd > today {
+                                let mut t = Task::new(&draft.title, cur);
+                                t.planned_ymd = draft.planned_ymd;
+                                self.tomorrow.push(t);
+                            } else {
+                                // Clamp to today if past (defensive)
+                                let idx = self.add_task(&draft.title, cur);
+                                if let Some(t) = self.day.tasks.get_mut(idx) {
+                                    t.planned_ymd = today;
+                                }
+                                self.selected = idx;
+                            }
                         }
                         self.input = None;
                     }
@@ -326,6 +380,18 @@ impl App {
                             input.buffer.trim().parse::<u16>().ok().unwrap_or(new_task_default);
                         let next = base.saturating_sub(5);
                         input.buffer = next.to_string();
+                    }
+                    KeyCode::Char('.') => {
+                        if let Some(d) = self.new_task.as_mut() {
+                            d.planned_ymd = crate::date::add_days_to_ymd(d.planned_ymd, 1);
+                        }
+                    }
+                    KeyCode::Char(',') => {
+                        if let Some(d) = self.new_task.as_mut() {
+                            let today = today_ymd();
+                            let cand = crate::date::add_days_to_ymd(d.planned_ymd, -1);
+                            d.planned_ymd = cand.max(today);
+                        }
                     }
                     KeyCode::Char(_c) => {}
                     _ => {}
@@ -367,6 +433,18 @@ impl App {
                     }
                     KeyCode::Char('j') => {
                         self.day.adjust_estimate(self.selected, -5);
+                    }
+                    KeyCode::Char('.') => {
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            t.planned_ymd = crate::date::add_days_to_ymd(t.planned_ymd, 1);
+                        }
+                    }
+                    KeyCode::Char(',') => {
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            let today = today_ymd();
+                            let cand = crate::date::add_days_to_ymd(t.planned_ymd, -1);
+                            t.planned_ymd = cand.max(today);
+                        }
                     }
                     _ => {}
                 },
@@ -856,7 +934,12 @@ impl App {
         let idx = self.selected.min(self.day.tasks.len() - 1);
         if let Some(task) = self.day.remove(idx) {
             // stay planned for tomorrow
-            self.tomorrow.push(Task { state: crate::task::TaskState::Planned, ..task });
+            let next_day = crate::date::add_days_to_ymd(today_ymd(), 1);
+            self.tomorrow.push(Task {
+                state: crate::task::TaskState::Planned,
+                planned_ymd: next_day,
+                ..task
+            });
         }
         if !self.day.tasks.is_empty() {
             self.selected = self.selected.min(self.day.tasks.len() - 1);
@@ -871,9 +954,11 @@ impl App {
             return;
         }
         let idx = self.selected.min(self.tomorrow.len() - 1);
-        let task = self.tomorrow.remove(idx);
+        let mut task = self.tomorrow.remove(idx);
         // Ensure it becomes Planned in Today and append to the end.
-        let t = Task { state: crate::task::TaskState::Planned, ..task };
+        task.state = crate::task::TaskState::Planned;
+        task.planned_ymd = today_ymd();
+        let t = task;
         self.day.add_task(t);
         // Adjust selection within Future list
         if !self.tomorrow.is_empty() {
@@ -928,6 +1013,9 @@ impl App {
     }
     pub fn new_task_default_estimate(&self) -> Option<u16> {
         self.new_task.as_ref().map(|d| d.default_estimate)
+    }
+    pub fn new_task_planned_ymd(&self) -> Option<u32> {
+        self.new_task.as_ref().map(|d| d.planned_ymd)
     }
     pub fn hovered_index(&self) -> Option<usize> {
         self.hovered
@@ -1170,6 +1258,8 @@ pub enum PopupButton {
     EstCancel,
     InputAdd,
     InputCancel,
+    DatePrev,
+    DateNext,
 }
 
 fn point_in_rect(x: u16, y: u16, r: Rect) -> bool {

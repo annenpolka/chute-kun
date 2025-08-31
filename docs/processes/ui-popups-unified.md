@@ -10,8 +10,8 @@ Overview
 
 In-Scope Popups
 - Title Input (New/Interrupt): OK/Cancel. Enter confirms, Esc cancels.
-- New-Task Estimate (Slider): Add/Cancel. Arrow keys/j/k adjust ±5m; slider is clickable/drag‑gable.
-- Estimate Edit (Slider): OK/Cancel. Same adjustment semantics as above.
+- New-Task Estimate (Slider): Add/Cancel. Arrow keys/j/k adjust ±5m; slider is clickable/drag‑gable. Date line with weekday is shown; see "Date Picker".
+- Estimate Edit (Slider): OK/Cancel. Same adjustment semantics as above. Date line with weekday is shown; see "Date Picker".
 - Command Palette: Run/Cancel. Input is typed while the popup is open; Enter or Run executes; Esc or Cancel closes without running.
 - Delete Confirmation: Delete/Cancel. While open, header (Act seconds) is frozen.
 
@@ -19,14 +19,17 @@ Keyboard Semantics
 - Enter: confirm (OK/Add/Run/Delete). Esc: cancel.
 - Estimate adjustment: ←/→/j/k ±5m.
 - New task defaults: Normal 25m, Interrupt 15m when estimate is not typed.
+- Date Picker: `.` = +1 day, `,` = −1 day（clamped ≥ Today）.
 
 Mouse Semantics
 - Buttons: hover highlight; left click to activate. Slider tracks accept click/drag to set minutes.
+- Date Picker: click `<` or `>` to step −/+1 day.
 - Tabs, list selection, and other interactions remain available when no popup is open.
 
 Rendering Rules
 - Popups are centered and sized to content; buttons are horizontally centered within the inner box.
 - The main content (task table or empty hint) does not change while popups are shown.
+- Date line displays one of `Today (Wed)`, `Tomorrow (Thu)`, or `YYYY-MM-DD (Fri)`. Operation hints live in the help line, not inside the popup.
 
 Tests (authoritative examples)
 - Command popup mouse E2E: `tests/app_command_popup_mouse_buttons_test.rs`.
@@ -37,4 +40,3 @@ Tests (authoritative examples)
 Related Modules
 - `src/lib/ui.rs`: popup geometry helpers and overlay renderers.
 - `src/lib/app.rs`: input state, key/mouse handling while popups are open.
-
