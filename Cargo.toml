@@ -3,6 +3,9 @@ name = "chute_kun"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+
+# MSRV
+rust-version = "1.74"
 description = "TaskChute + Todoist CLI/TUI — Rust TUI template using ratatui + crossterm"
 # NOTE: Set these URLs to your real locations before `cargo publish`.
 # e.g., https://github.com/<owner>/chute_kun

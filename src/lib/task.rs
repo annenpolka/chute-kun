@@ -82,7 +82,8 @@ impl Task {
 
 impl Task {
     pub fn start_session(&mut self, now_min: u16) {
-        let need_new = self.sessions.last().is_none_or(|s| s.end_min.is_some());
+        // MSRV 1.74: `Option::is_none_or` is not available; use `map_or`.
+        let need_new = self.sessions.last().map_or(true, |s| s.end_min.is_some());
         if need_new {
             self.sessions.push(Session { start_min: now_min, end_min: None });
         }
