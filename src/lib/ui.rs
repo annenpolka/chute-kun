@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{block::Title, Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -26,11 +26,10 @@ pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.area();
     let header_line = header_title_line(app_display_base(app), app);
     let actions_line = header_action_buttons_line(app);
-    // Left stats + right action buttons in the title bar
+    // Left-align stats and right-align action buttons independently on the title bar
     let block = Block::default()
-        .title(header_line)
-        .title(Title::from(actions_line))
-        .title_alignment(Alignment::Right)
+        .title(header_line.left_aligned())
+        .title(actions_line.right_aligned())
         .borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
