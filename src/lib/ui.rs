@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
+    widgets::{block::Title, Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -25,7 +25,13 @@ const MIN_LIST_LINES: u16 = 3; // table header + at least two rows
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.area();
     let header_line = header_title_line(app_display_base(app), app);
-    let block = Block::default().title(header_line).borders(Borders::ALL);
+    let actions_line = header_action_buttons_line(app);
+    // Left stats + right action buttons in the title bar
+    let block = Block::default()
+        .title(header_line)
+        .title(Title::from(actions_line))
+        .title_alignment(Alignment::Right)
+        .borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -705,6 +711,97 @@ pub fn header_title_line(now_min: u16, app: &App) -> Line<'static> {
     line
 }
 
+/// Right-aligned action buttons for the title bar: New | Start | Stop | Finish | Delete.
+/// Buttons render as bold, black-on-colored "pills" similar to other UI elements.
+pub fn header_action_buttons_line(app: &App) -> Line<'static> {
+    let hovered = app.hovered_header_button();
+    let labels = header_action_button_labels();
+    let enabled = header_action_button_enabled(app);
+    let colors = [Color::Green, Color::Blue, Color::Yellow, Color::Magenta, Color::Red];
+    let mut spans: Vec<Span> = Vec::new();
+    for i in 0..labels.len() {
+        let label = &labels[i];
+        let is_enabled = enabled[i];
+        let is_hover = matches!(
+            (i, hovered),
+            (0, Some(crate::app::HeaderButton::New))
+                | (1, Some(crate::app::HeaderButton::Start))
+                | (2, Some(crate::app::HeaderButton::Stop))
+                | (3, Some(crate::app::HeaderButton::Finish))
+                | (4, Some(crate::app::HeaderButton::Delete))
+        );
+        let style = if is_enabled {
+            let bg = if is_hover { Color::Cyan } else { colors[i] };
+            Style::default().fg(Color::Black).bg(bg).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        spans.push(Span::styled(label.clone(), style));
+        if i + 1 != labels.len() {
+            spans.push(Span::raw(" "));
+        }
+    }
+    Line::from(spans)
+}
+
+/// Compute hitboxes (terminal rectangles) for each header action button on the top border line.
+/// Returns boxes in the same order as rendering: [New, Start, Stop, Finish, Delete].
+/// Coordinates are relative to the full `area` passed to the app draw loop.
+pub fn header_action_buttons_hitboxes(area: Rect) -> Vec<Rect> {
+    // Available width for titles excludes the two corner cells.
+    let available = area.width.saturating_sub(2);
+    let labels = header_action_button_labels(); // include shortcut hints
+    let gaps = 4u16; // 4 spaces between 5 labels
+    let labels_w: u16 = labels.iter().map(|s| UnicodeWidthStr::width(s.as_str()) as u16).sum();
+    let total_w = labels_w + gaps;
+    // Start X for the right-aligned group: left corner + (available - total)
+    let start_x = area.x + 1 + available.saturating_sub(total_w);
+    let mut xs = start_x;
+    let mut rects: Vec<Rect> = Vec::with_capacity(labels.len());
+    for (i, s) in labels.iter().enumerate() {
+        let w = UnicodeWidthStr::width(s.as_str()) as u16;
+        rects.push(Rect { x: xs, y: area.y, width: w.max(1), height: 1 });
+        xs = xs.saturating_add(w);
+        if i + 1 != labels.len() {
+            xs = xs.saturating_add(1); // gap space
+        }
+    }
+    rects
+}
+
+/// Labels (with keyboard shortcut hints) used for header buttons in both render and hitboxes.
+pub fn header_action_button_labels() -> Vec<String> {
+    // Keep labels short to avoid overlapping the left stats header on narrow terminals.
+    // Keyboard shortcuts remain documented in the help line.
+    vec![
+        "New".to_string(),
+        "Start".to_string(),
+        "Stop".to_string(),
+        "Finish".to_string(),
+        "Delete".to_string(),
+    ]
+}
+
+/// Enabled state for each header button (New, Start, Stop, Finish, Delete).
+pub fn header_action_button_enabled(app: &App) -> [bool; 5] {
+    use crate::app::View;
+    let on_today = matches!(app.view(), View::Today);
+    let has_today = !app.day.tasks.is_empty();
+    let selected_eligible = on_today
+        && app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| {
+                matches!(t.state, crate::task::TaskState::Paused | crate::task::TaskState::Planned)
+            })
+            .unwrap_or(false);
+    let has_active = on_today && app.day.active_index().is_some();
+    let can_finish = on_today && has_today;
+    let can_delete = on_today && has_today;
+    [true, selected_eligible, has_active, can_finish, can_delete]
+}
+
 pub fn format_header_line(now_min: u16, app: &App) -> String {
     let _remaining = app.day.remaining_total_min();
     let esd_min = app.day.esd(now_min);
@@ -744,31 +841,64 @@ pub fn format_help_line() -> String {
 /// - Today: show full task actions
 /// - Past/Future: show only navigation and quit to reduce noise
 pub fn format_help_line_for(app: &App) -> String {
-    match app.view() {
-        View::Today => format_help_line(),
-        View::Past => "q: quit | Tab: switch view".to_string(),
-        View::Future => "q: quit | Tab: switch view | b: bring".to_string(),
-    }
+    // Build items using the same source as wrapped help
+    let items = help_items_for(app);
+    items.join(" | ")
 }
 
 /// Build help items depending on the current view. Used for wrapping.
-pub fn help_items_for(app: &App) -> Vec<&'static str> {
-    let mut items: Vec<&'static str> = vec!["q: quit", "Tab: switch view"];
-    if matches!(app.view(), View::Today) {
-        items.extend([
-            "Enter: start/resume",
-            "Space: pause",
-            "Shift+Enter/f: finish",
-            "i: interrupt",
-            "p: postpone",
-            "x: delete",
-            "[: up",
-            "]: down",
-            "e: edit",
-            "j/k",
-        ]);
-        if app.is_estimate_editing() || app.is_new_task_estimate() {
-            items.extend([".: +1 day", ",: -1 day", "click < >: date"]);
+pub fn help_items_for(app: &App) -> Vec<String> {
+    use crate::config::join_key_labels as join;
+    let km = &app.config.keys;
+    let mut items: Vec<String> =
+        vec![format!("{}: quit", join(&km.quit)), format!("{}: switch view", join(&km.view_next))];
+    match app.view() {
+        View::Today => {
+            items.push(format!("{}: start/pause", join(&km.start_or_resume)));
+            items.push(format!("{}: pause", join(&km.pause)));
+            items.push(format!("{}: finish", join(&km.finish_active)));
+            // Interrupt: reflect configured keys
+            items.push(format!("{}: interrupt", join(&km.add_interrupt)));
+            items.push(format!("{}: postpone", join(&km.postpone)));
+            // delete key now configurable
+            items.push(format!("{}: delete", join(&km.delete)));
+            items.push(format!("{}: up", join(&km.reorder_up)));
+            items.push(format!("{}: down", join(&km.reorder_down)));
+            items.push(format!("{}: edit", join(&km.estimate_plus)));
+            // Compact vim-like navigation chars as trailing hint (if present)
+            let up_chars: Vec<char> = km
+                .select_up
+                .iter()
+                .filter_map(|k| match k.code {
+                    crossterm::event::KeyCode::Char(c) if k.modifiers.is_empty() => Some(c),
+                    _ => None,
+                })
+                .collect();
+            let down_chars: Vec<char> = km
+                .select_down
+                .iter()
+                .filter_map(|k| match k.code {
+                    crossterm::event::KeyCode::Char(c) if k.modifiers.is_empty() => Some(c),
+                    _ => None,
+                })
+                .collect();
+            if let (Some(d), Some(u)) = (down_chars.first(), up_chars.first()) {
+                items.push(format!("{}/{}", d, u));
+            } else {
+                items.push("j/k".to_string());
+            }
+            // Date picker hints only while date popups are open
+            if app.is_estimate_editing() || app.is_new_task_estimate() {
+                items.push(".: +1 day".to_string());
+                items.push(",: -1 day".to_string());
+                items.push("click < >: date".to_string());
+            }
+        }
+        View::Past => {
+            // Minimal: quit + switch view
+        }
+        View::Future => {
+            items.push(format!("{}: bring", join(&km.bring_to_today)));
         }
     }
     items
@@ -776,7 +906,7 @@ pub fn help_items_for(app: &App) -> Vec<&'static str> {
 
 /// Wrap help items into lines that fit within `width` cells, inserting ` | ` between items.
 /// This uses Unicode width to count display cells.
-pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
+pub fn wrap_help_items_to_width(items: &[String], width: u16) -> Vec<String> {
     let width = width as usize;
     if width == 0 {
         return vec![String::new()];
@@ -784,9 +914,9 @@ pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut cur = String::new();
     let sep = " | ";
-    for item in items {
+    for item in items.iter() {
         if cur.is_empty() {
-            cur.push_str(item);
+            cur.push_str(item.as_str());
             continue;
         }
         let candidate = format!("{}{}{}", cur, sep, item);
@@ -795,7 +925,7 @@ pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
         } else {
             // commit current line and start a new one
             lines.push(cur);
-            cur = (*item).to_string();
+            cur = item.to_string();
         }
     }
     if !cur.is_empty() {

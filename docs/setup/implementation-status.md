@@ -14,7 +14,7 @@
 ## 主要ファイル
 - `src/cli/main.rs`: 端末初期化/終了、描画ループ、入力ポーリング、秒単位 `tick` 呼び出し
 - `src/lib/app.rs`: アプリ状態、キー操作、`tick(seconds)` による実績加算（60秒で1分）
-- `src/lib/ui.rs`: ヘッダ（ESD/Est/Act/View）とタスクリスト描画
+- `src/lib/ui.rs`: ヘッダ（ESD/Est/Act）＋タイトルバー右上ボタン（New/Start/Stop/Finish/Delete）、タスクリスト描画
 - `src/lib.rs`: 上記モジュールのエクスポート（パス指定）
 
 ## 依存関係

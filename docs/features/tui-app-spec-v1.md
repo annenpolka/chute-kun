@@ -8,6 +8,10 @@
 
 ## 画面構成
 - ヘッダ: `YYYY-MM-DD` ベース情報 + 見積合計/実績合計 + ESD（見込み終了時刻）
+  - 右上: アクションボタン（New | Start | Stop | Finish | Delete）
+    - 表示: 太字の黒文字＋色付きピル（有効時）。無効時は灰文字（背景なし・非太字）。
+    - ホバー: シアン背景でハイライト（有効時のみ）。
+    - クリック: 有効時のみ動作（無効時は抑止）。
 - メインリスト（Today Queue／ratatui::Table）:
   - カラム: `Plan(予定時刻)` / `Actual(実測要約)` / `Task(状態+タイトル+見積/実績)`
   - 選択行の背景ハイライト、ホバー表示、空時のヒント表示
@@ -35,6 +39,13 @@
 - Quit: `q`
 
 （注）キーバインドは後続実装で微調整可。原則として片手操作と視線移動最小化を重視。
+
+### ヘルプ表示とキーバインド
+- 画面下部のヘルプ行は現在のコンフィグ（`config.toml`）のキーアサインを反映して表示されます。
+- 例: `finish_active = "g"` の場合、Today ビューでは `g: finish`。`view_next = "Ctrl+N"` の場合は表示が正規化され `Ctrl+n: switch view`。
+- 複数割り当ては `/` 区切りで表示: 例）`finish_active = ["Shift+Enter", "f"]` → `Shift+Enter/f: finish`。
+- Delete もコンフィグ可能（例: `delete = "Ctrl+d"` → `Ctrl+d: delete`）。
+- `BackTab` はヘルプ上は `Shift+Tab` として表示されます。設定は `BackTab`/`Shift+Tab` のどちらでも可。
 
 ## 状態遷移（タスク）
 - `planned → (start) → active → (pause) → paused → (resume) → active → (finish) → done`
