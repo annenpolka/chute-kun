@@ -1,4 +1,4 @@
-use chute_kun::{app::App, task::Session, ui};
+use chute_kun::{app::App, clock::Clock, task::Session, ui};
 use ratatui::{backend::TestBackend, Terminal};
 
 fn buf_contains(buf: &ratatui::buffer::Buffer, needle: &str) -> bool {
@@ -32,7 +32,15 @@ fn calendar_mode_shows_hours_and_blocks() {
     // t once: List -> Calendar (Blocks view removed)
     app.toggle_display_mode();
 
-    terminal.draw(|f| ui::draw(f, &app)).unwrap();
+    // Inject a stable "now" that won't overwrite the first plan row title
+    struct TestClock(u16);
+    impl Clock for TestClock {
+        fn now_minutes(&self) -> u16 {
+            self.0
+        }
+    }
+    let now = app.config.day_start_minutes + 30; // 30m after base
+    terminal.draw(|f| ui::draw_with_clock(f, &app, &TestClock(now))).unwrap();
     let buf = terminal.backend().buffer().clone();
 
     // Expect hour labels derived from configured day start

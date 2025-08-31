@@ -24,11 +24,16 @@ fn same_task_overlapping_sessions_merge_into_one_column() {
     // Actual レーン範囲だけを対象に 'A' が1以下であることを確認
     let area = ratatui::layout::Rect { x: 0, y: 0, width: buf.area.width, height: buf.area.height };
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, area);
-    let gutter = 6u16; let lanes_w = list.width.saturating_sub(gutter + 2);
-    let lane_w = (lanes_w.saturating_sub(1)) / 2; let plan_x0 = list.x + gutter + 1; let act_x0 = plan_x0 + lane_w + 1;
+    let gutter = 6u16;
+    let lanes_w = list.width.saturating_sub(gutter + 2);
+    let lane_w = (lanes_w.saturating_sub(1)) / 2;
+    let plan_x0 = list.x + gutter + 1;
+    let act_x0 = plan_x0 + lane_w + 1;
     for y in list.y..list.y + list.height {
         let mut s = String::new();
-        for x in act_x0..act_x0 + lane_w { s.push_str(buf[(x, y)].symbol()); }
+        for x in act_x0..act_x0 + lane_w {
+            s.push_str(buf[(x, y)].symbol());
+        }
         let count_a = s.matches('A').count();
         assert!(count_a <= 1, "row {} has multiple 'A' in act lane: {}", y, s);
     }

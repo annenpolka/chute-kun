@@ -41,7 +41,9 @@ fn cell_at<'a>(buf: &'a ratatui::buffer::Buffer, x: u16, y: u16) -> &'a ratatui:
 
 struct FixedClock(u16);
 impl chute_kun::clock::Clock for FixedClock {
-    fn now_minutes(&self) -> u16 { self.0 }
+    fn now_minutes(&self) -> u16 {
+        self.0
+    }
 }
 
 #[test]
@@ -53,8 +55,8 @@ fn calendar_plan_lane_uses_category_colors() {
     let base = app.config.day_start_minutes;
     app.add_task("Work Block", 60);
     app.add_task("Home Block", 30);
-    app.day.tasks[0].category = Category::Work;  // Blue
-    app.day.tasks[1].category = Category::Home;  // Yellow
+    app.day.tasks[0].category = Category::Work; // Blue
+    app.day.tasks[1].category = Category::Home; // Yellow
 
     // Switch to Calendar
     app.toggle_display_mode();
@@ -68,7 +70,7 @@ fn calendar_plan_lane_uses_category_colors() {
     let full = Rect { x: 0, y: 0, width: buf.area.width, height: buf.area.height };
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, full);
     let gutter = 6u16; // "HH:00"
-    let gaps = 2u16;   // one space after gutter + one between lanes
+    let gaps = 2u16; // one space after gutter + one between lanes
     let lanes_w = list.width.saturating_sub(gutter + gaps);
     let lane_w = (lanes_w.saturating_sub(1)) / 2;
     let plan_x0 = list.x + gutter + 1; // after one space gap
@@ -98,7 +100,8 @@ fn calendar_actual_lane_uses_category_colors() {
 
     // Add one closed actual session for the second task
     if let Some(t) = app.day.tasks.get_mut(1) {
-        t.sessions.push(chute_kun::task::Session { start_min: base + 10, end_min: Some(base + 40) });
+        t.sessions
+            .push(chute_kun::task::Session { start_min: base + 10, end_min: Some(base + 40) });
     }
 
     app.toggle_display_mode();
@@ -130,4 +133,3 @@ fn calendar_actual_lane_uses_category_colors() {
     let y = found_row.expect("no actual session block row found");
     assert_eq!(cell_at(&buf, act_x0, y).style().fg, Some(Color::Magenta));
 }
-

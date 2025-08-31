@@ -5,8 +5,12 @@ fn find_all_rows_with(buf: &ratatui::buffer::Buffer, needle: &str) -> Vec<u16> {
     let mut rows = Vec::new();
     for y in 0..buf.area.height {
         let mut s = String::new();
-        for x in 0..buf.area.width { s.push_str(buf[(x, y)].symbol()); }
-        if s.contains(needle) { rows.push(y); }
+        for x in 0..buf.area.width {
+            s.push_str(buf[(x, y)].symbol());
+        }
+        if s.contains(needle) {
+            rows.push(y);
+        }
     }
     rows
 }
@@ -27,7 +31,11 @@ fn calendar_plan_lane_uses_per_range_category_even_with_duplicate_titles() {
     // Switch to Calendar and draw later so Now row does not interfere
     app.toggle_display_mode();
     struct Fixed(u16);
-    impl chute_kun::clock::Clock for Fixed { fn now_minutes(&self) -> u16 { self.0 } }
+    impl chute_kun::clock::Clock for Fixed {
+        fn now_minutes(&self) -> u16 {
+            self.0
+        }
+    }
     let clock = Fixed(base + 200);
     terminal.draw(|f| ui::draw_with_clock(f, &app, &clock)).unwrap();
     let buf = terminal.backend().buffer().clone();
@@ -35,7 +43,8 @@ fn calendar_plan_lane_uses_per_range_category_even_with_duplicate_titles() {
     // Compute plan lane start X
     let full = Rect { x: 0, y: 0, width: buf.area.width, height: buf.area.height };
     let (_tabs, _banner, list, _help) = ui::compute_layout(&app, full);
-    let gutter = 6u16; let gaps = 2u16;
+    let gutter = 6u16;
+    let gaps = 2u16;
     let lanes_w = list.width.saturating_sub(gutter + gaps);
     let lane_w = (lanes_w.saturating_sub(1)) / 2;
     let plan_x0 = list.x + gutter + 1;
@@ -54,4 +63,3 @@ fn calendar_plan_lane_uses_per_range_category_even_with_duplicate_titles() {
     let x_bot = (plan_x0..plan_x0 + lane_w).find(|&x| buf[(x, y_bottom)].symbol() == "S").unwrap();
     assert_eq!(buf[(x_bot, y_bottom)].style().fg, Some(Color::Yellow));
 }
-

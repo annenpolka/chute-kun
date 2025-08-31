@@ -26,4 +26,3 @@ fn subminute_actual_sessions_are_hidden() {
         }
     }
 }
-

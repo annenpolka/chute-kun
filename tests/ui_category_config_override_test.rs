@@ -34,7 +34,12 @@ color = "cyan"
 
     // Open category picker via right-click on the dot and ensure label 'Client' appears
     app.handle_mouse_event(
-        MouseEvent { kind: MouseEventKind::Down(MouseButton::Right), column: dot_x, row: row_y, modifiers: crossterm::event::KeyModifiers::empty() },
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Right),
+            column: dot_x,
+            row: row_y,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        },
         area,
     );
     terminal.draw(|f| ui::draw(f, &app)).unwrap();
@@ -42,8 +47,13 @@ color = "cyan"
     let mut found_label = false;
     for y in 0..buf2.area.height {
         let mut s = String::new();
-        for x in 0..buf2.area.width { s.push_str(buf2[(x, y)].symbol()); }
-        if s.contains("Client") { found_label = true; break; }
+        for x in 0..buf2.area.width {
+            s.push_str(buf2[(x, y)].symbol());
+        }
+        if s.contains("Client") {
+            found_label = true;
+            break;
+        }
     }
     assert!(found_label, "picker should contain overridden category name");
 }

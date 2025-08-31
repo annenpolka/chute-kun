@@ -11,8 +11,8 @@ fn header_shows_seconds_while_paused() {
     // 59秒経過
     app.tick(59);
 
-    // 一時停止
-    app.handle_key(KeyCode::Char(' '));
+    // 一時停止（Enter のトグルで）
+    app.handle_key(KeyCode::Enter);
 
     // 09:00 時点のヘッダーで 59秒が表示されていること（切り捨てない）
     let header = format_header_line(9 * 60, &app);

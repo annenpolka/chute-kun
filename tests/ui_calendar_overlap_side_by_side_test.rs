@@ -27,7 +27,9 @@ fn find_row_with_both<'a>(buf: &'a ratatui::buffer::Buffer, a: char, b: char) ->
 
 struct FixedClock(u16);
 impl chute_kun::clock::Clock for FixedClock {
-    fn now_minutes(&self) -> u16 { self.0 }
+    fn now_minutes(&self) -> u16 {
+        self.0
+    }
 }
 
 #[test]
@@ -66,10 +68,13 @@ fn overlapping_actual_sessions_render_side_by_side_columns() {
 
     // Find a row that shows both 'A' and 'B' (titles overlaid at start of each block)
     let y = find_row_with_both(&buf, 'A', 'B').expect("expected both titles on same row");
-    let xa = (act_x0..act_x0 + lane_w).find(|&x| cell(&buf, x, y).symbol() == "A").expect("A not in act lane");
-    let xb = (act_x0..act_x0 + lane_w).find(|&x| cell(&buf, x, y).symbol() == "B").expect("B not in act lane");
+    let xa = (act_x0..act_x0 + lane_w)
+        .find(|&x| cell(&buf, x, y).symbol() == "A")
+        .expect("A not in act lane");
+    let xb = (act_x0..act_x0 + lane_w)
+        .find(|&x| cell(&buf, x, y).symbol() == "B")
+        .expect("B not in act lane");
 
     // Expect that the two titles are placed in different horizontal regions (columns)
     assert!((xa as i32 - xb as i32).abs() as u16 >= 2, "titles should not overlap horizontally");
 }
-

@@ -54,6 +54,11 @@ pub struct Task {
     /// User classification for the task (e.g., Work/Home/Hobby). Defaults to General.
     #[serde(default)]
     pub category: Category,
+    /// Optional fixed planned start time in minutes since local midnight.
+    /// When present, the visual schedule uses `max(cursor, fixed_start_min)` at this task
+    /// and pushes the subsequent tasks based on estimates from there.
+    #[serde(default)]
+    pub fixed_start_min: Option<u16>,
 }
 
 impl Task {
@@ -70,6 +75,7 @@ impl Task {
             planned_ymd: crate::date::today_ymd(),
             done_ymd: None,
             category: Category::General,
+            fixed_start_min: None,
         }
     }
 }
