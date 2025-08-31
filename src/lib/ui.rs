@@ -47,7 +47,14 @@ pub fn draw(f: &mut Frame, app: &App) {
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    help_height = help_height.max(1);
+    // Ensure at least three lines (gauge + labels + help) when space allows
+    help_height = if max_help >= 3 {
+        help_height.max(3)
+    } else if max_help >= 2 {
+        help_height.max(2)
+    } else {
+        help_height.max(1)
+    };
 
     // Split inner area: tabs, optional banner, task list, help block.
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
@@ -101,15 +108,57 @@ pub fn draw(f: &mut Frame, app: &App) {
         }
     }
 
-    // Help block at the bottom (wrapped to fit width)
+    // Help block with 24h gauge at the top of the help area (help text below)
     // When an active banner is present, help resides at the last chunk, not index 2.
     let help_idx = chunks.len().saturating_sub(1);
     if chunks[help_idx].height > 0 {
-        let help_text = help_lines.join("\n");
-        let help = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .wrap(Wrap { trim: true });
-        f.render_widget(help, chunks[help_idx]);
+        let help_area = chunks[help_idx];
+        match help_area.height {
+            0 => {}
+            1 => {
+                // Not enough space: show help text, skip gauge/labels
+                let help_text = help_lines.join("\n");
+                let help = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: true });
+                f.render_widget(help, help_area);
+            }
+            2 => {
+                // Show gauge on first line, help text on second; skip labels to keep help visible
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
+                let help_text_area =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
+                let help_text = help_lines.join("\n");
+                let help = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: true });
+                f.render_widget(help, help_text_area);
+            }
+            _ => {
+                // ≥3 lines: gauge, labels, then help text
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
+                let label_rect =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
+                render_gauge_labels(f, label_rect);
+                let help_text_area = Rect {
+                    x: help_area.x,
+                    y: help_area.y + 2,
+                    width: help_area.width,
+                    height: help_area.height.saturating_sub(2),
+                };
+                if help_text_area.height > 0 {
+                    let help_text = help_lines.join("\n");
+                    let help = Paragraph::new(help_text)
+                        .style(Style::default().fg(Color::DarkGray))
+                        .wrap(Wrap { trim: true });
+                    f.render_widget(help, help_text_area);
+                }
+            }
+        }
     }
 
     // Overlay: centered estimate editor popup (date + slider + OK/Cancel)
@@ -461,7 +510,13 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    help_height = help_height.max(1);
+    help_height = if max_help >= 3 {
+        help_height.max(3)
+    } else if max_help >= 2 {
+        help_height.max(2)
+    } else {
+        help_height.max(1)
+    };
     let mut constraints: Vec<Constraint> = vec![Constraint::Length(1)];
     if active_banner.is_some() {
         constraints.push(Constraint::Length(1));
@@ -510,14 +565,53 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         }
     }
 
-    // Help block at the bottom (wrapped to fit width)
+    // Help block with gauge on top under injected clock
     let help_idx = chunks.len().saturating_sub(1);
     if chunks[help_idx].height > 0 {
-        let help_text = help_lines.join("\n");
-        let help = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .wrap(Wrap { trim: true });
-        f.render_widget(help, chunks[help_idx]);
+        let help_area = chunks[help_idx];
+        match help_area.height {
+            0 => {}
+            1 => {
+                let help_text = help_lines.join("\n");
+                let help = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: true });
+                f.render_widget(help, help_area);
+            }
+            2 => {
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
+                let help_text_area =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
+                let help_text = help_lines.join("\n");
+                let help = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: true });
+                f.render_widget(help, help_text_area);
+            }
+            _ => {
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
+                let label_rect =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
+                render_gauge_labels(f, label_rect);
+                let help_text_area = Rect {
+                    x: help_area.x,
+                    y: help_area.y + 2,
+                    width: help_area.width,
+                    height: help_area.height.saturating_sub(2),
+                };
+                if help_text_area.height > 0 {
+                    let help_text = help_lines.join("\n");
+                    let help = Paragraph::new(help_text)
+                        .style(Style::default().fg(Color::DarkGray))
+                        .wrap(Wrap { trim: true });
+                    f.render_widget(help, help_text_area);
+                }
+            }
+        }
     }
 
     // Overlay: centered delete confirmation popup with colored text
@@ -1257,6 +1351,116 @@ fn render_tabs_line(f: &mut Frame, rect: Rect, app: &App) {
     f.render_widget(para, rect);
 }
 
+/// Render a one-line 24h horizontal gauge showing actual work sessions by category.
+/// - Range is fixed to 00:00..24:00 mapped across `rect.width` cells.
+/// - Colored segments reflect task categories; overlapping sessions pick the last seen.
+/// - Ongoing session uses `now_min` as its temporary end.
+fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+    let w = rect.width as usize;
+    // Prepare per-cell colors and glyphs; default None means no work recorded
+    let mut cells: Vec<Option<Color>> = vec![None; w];
+    let mut glyphs: Vec<char> = vec!['·'; w];
+    // Gather all actual sessions for the current view's tasks
+    let tasks_slice: Vec<crate::task::Task> = match app.view() {
+        View::Past => app.history_tasks().clone(),
+        View::Today => app.day.tasks.clone(),
+        View::Future => app.tomorrow_tasks().clone(),
+    };
+    for t in tasks_slice.iter() {
+        let cat_color = app.config.category_color(t.category);
+        for s in t.sessions.iter() {
+            let s_min = s.start_min.min(23 * 60 + 59);
+            let e_min = s.end_min.unwrap_or(now_min).min(23 * 60 + 59);
+            if e_min < s_min {
+                continue;
+            }
+            let x0 = ((s_min as u32) * (rect.width as u32) / 1440) as usize;
+            let x1 = ((e_min as u32) * (rect.width as u32) / 1440) as usize;
+            let x0 = x0.min(w.saturating_sub(1));
+            let x1 = x1.min(w.saturating_sub(1)).max(x0);
+            for i in x0..=x1 {
+                cells[i] = Some(cat_color);
+                glyphs[i] = '█';
+            }
+        }
+    }
+    // Overlay hour ticks every 60 minutes (only on empty cells to avoid hiding data)
+    for h in (0..=24).map(|h| h * 60) {
+        let x = ((h as u32) * (rect.width as u32) / 1440) as usize;
+        if x < w && cells[x].is_none() {
+            glyphs[x] = '|';
+            cells[x] = Some(Color::DarkGray);
+        }
+    }
+    // Overlay thicker ticks at 6h, 12h, 18h (always visible)
+    for h in [6u16, 12u16, 18u16] {
+        let x = ((h as u32 * 60) * (rect.width as u32) / 1440) as usize;
+        if x < w {
+            glyphs[x] = '│';
+            cells[x] = Some(Color::DarkGray);
+        }
+    }
+    // Overlay current time marker '^' in red, always on top
+    let x_now = ((now_min as u32) * (rect.width as u32) / 1440) as usize;
+    if x_now < w {
+        glyphs[x_now] = '^';
+        cells[x_now] = Some(Color::Red);
+    }
+
+    // Render labels above the gauge if there is space handled by caller
+    // Compress into styled spans (by (glyph, color))
+    let mut spans: Vec<Span> = Vec::new();
+    let mut i = 0usize;
+    while i < w {
+        let g = glyphs[i];
+        let c = cells[i];
+        let mut j = i + 1;
+        while j < w && glyphs[j] == g && cells[j] == c {
+            j += 1;
+        }
+        let text: String = std::iter::repeat_n(g, j - i).collect();
+        let style = match c {
+            Some(_) if g == '|' => Style::default().fg(Color::DarkGray),
+            Some(color) => Style::default().fg(color).add_modifier(Modifier::BOLD),
+            None => Style::default().fg(Color::DarkGray),
+        };
+        spans.push(Span::styled(text, style));
+        i = j;
+    }
+    let line = Line::from(spans);
+    let para = Paragraph::new(line);
+    f.render_widget(para, rect);
+}
+
+/// Render labels for major ticks (6, 12, 18) on the provided one-line rect.
+fn render_gauge_labels(f: &mut Frame, rect: Rect) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+    let w = rect.width as usize;
+    let mut line: Vec<char> = vec![' '; w];
+    let put = |line: &mut [char], x: usize, s: &str| {
+        for (i, ch) in s.chars().enumerate() {
+            if x + i < line.len() {
+                line[x + i] = ch;
+            }
+        }
+    };
+    let map_x = |m: u16, width: u16| -> usize { ((m as u32) * (width as u32) / 1440u32) as usize };
+    let x6 = map_x(6 * 60, rect.width);
+    let x12 = map_x(12 * 60, rect.width);
+    let x18 = map_x(18 * 60, rect.width);
+    put(&mut line, x6, "6");
+    put(&mut line, x12, "12");
+    put(&mut line, x18, "18");
+    let text: String = line.into_iter().collect();
+    let para = Paragraph::new(Span::styled(text, Style::default().fg(Color::DarkGray)));
+    f.render_widget(para, rect);
+}
+
 /// Compute hitboxes for tab titles inside the `tabs_rect`.
 pub fn tab_hitboxes(app: &App, tabs_rect: Rect) -> Vec<Rect> {
     let (titles, _sel) = tab_titles(app);
@@ -1692,7 +1896,15 @@ pub fn compute_layout(app: &App, area: Rect) -> (Rect, Option<Rect>, Rect, Rect)
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    help_height = help_height.max(1);
+    // Ensure at least three lines (gauge + labels + help) when space allows;
+    // otherwise keep at least two (gauge + help) or one (help only).
+    help_height = if max_help >= 3 {
+        help_height.max(3)
+    } else if max_help >= 2 {
+        help_height.max(2)
+    } else {
+        help_height.max(1)
+    };
     let tabs = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
     let mut y = inner.y + 1;
     let banner = if has_banner {
