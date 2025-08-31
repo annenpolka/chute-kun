@@ -39,12 +39,12 @@
 
 （注）キーバインドは後続実装で微調整可。原則として片手操作と視線移動最小化を重視。
 
-### タイトルバーのアクションボタン（マウス）
-- New: タスク新規入力を開く（`i` と同等）。常に有効。
-- Start: 選択タスクを開始/再開（`Enter` と同等）。Today かつ `Planned|Paused` のとき有効。
-- Stop: 実行中タスクを一時停止（`Space` と同等）。Today で `Active` が存在するとき有効。
-- Finish: 選択タスクを完了（`Shift+Enter|f` と同等）。Today でタスクが1件以上あるとき有効。
-- Delete: 削除確認を開く（`x` と同等）。Today でタスクが1件以上あるとき有効。
+### ヘルプ表示とキーバインド
+- 画面下部のヘルプ行は現在のコンフィグ（`config.toml`）のキーアサインを反映して表示されます。
+- 例: `finish_active = "g"` の場合、Today ビューでは `g: finish`。`view_next = "Ctrl+N"` の場合は表示が正規化され `Ctrl+n: switch view`。
+- 複数割り当ては `/` 区切りで表示: 例）`finish_active = ["Shift+Enter", "f"]` → `Shift+Enter/f: finish`。
+- Delete もコンフィグ可能（例: `delete = "Ctrl+d"` → `Ctrl+d: delete`）。
+- `BackTab` はヘルプ上は `Shift+Tab` として表示されます。設定は `BackTab`/`Shift+Tab` のどちらでも可。
 
 ## 状態遷移（タスク）
 - `planned → (start) → active → (pause) → paused → (resume) → active → (finish) → done`
