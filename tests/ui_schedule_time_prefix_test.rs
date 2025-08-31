@@ -13,7 +13,7 @@ fn task_lines_prefix_with_scheduled_time_at_left() {
 }
 
 #[test]
-fn active_progress_shortens_next_task_scheduled_time() {
+fn active_progress_does_not_change_next_task_scheduled_time() {
     let mut app = App::new();
     app.add_task("A", 30);
     app.add_task("B", 20);
@@ -22,6 +22,6 @@ fn active_progress_shortens_next_task_scheduled_time() {
     app.day.add_actual_to_active(10);
 
     let lines = ui::format_task_lines_at(9 * 60, &app);
-    // B should now start at 09:20 instead of 09:30
-    assert!(lines[1].starts_with("09:20 "));
+    // Plan should not pull in by ACT time; B stays at 09:30
+    assert!(lines[1].starts_with("09:30 "));
 }
