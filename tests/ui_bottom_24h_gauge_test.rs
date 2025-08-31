@@ -58,4 +58,3 @@ fn bottom_gauge_shows_category_segments_over_24h() {
     assert_eq!(cell_at(&buf, x_work, gauge_y).style().fg, Some(Color::Blue));
     assert_eq!(cell_at(&buf, x_home, gauge_y).style().fg, Some(Color::Yellow));
 }
-

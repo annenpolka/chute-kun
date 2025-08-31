@@ -108,8 +108,18 @@ pub fn draw(f: &mut Frame, app: &App) {
         let help_area = chunks[help_idx];
         // Reserve the last line for the 24h category gauge, render help text above it
         let (help_text_area, gauge_area) = if help_area.height >= 1 {
-            let g = Rect { x: help_area.x, y: help_area.y + help_area.height - 1, width: help_area.width, height: 1 };
-            let h = Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: help_area.height.saturating_sub(1) };
+            let g = Rect {
+                x: help_area.x,
+                y: help_area.y + help_area.height - 1,
+                width: help_area.width,
+                height: 1,
+            };
+            let h = Rect {
+                x: help_area.x,
+                y: help_area.y,
+                width: help_area.width,
+                height: help_area.height.saturating_sub(1),
+            };
             (h, g)
         } else {
             (help_area, help_area)
@@ -530,8 +540,18 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     if chunks[help_idx].height > 0 {
         let help_area = chunks[help_idx];
         let (help_text_area, gauge_area) = if help_area.height >= 1 {
-            let g = Rect { x: help_area.x, y: help_area.y + help_area.height - 1, width: help_area.width, height: 1 };
-            let h = Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: help_area.height.saturating_sub(1) };
+            let g = Rect {
+                x: help_area.x,
+                y: help_area.y + help_area.height - 1,
+                width: help_area.width,
+                height: 1,
+            };
+            let h = Rect {
+                x: help_area.x,
+                y: help_area.y,
+                width: help_area.width,
+                height: help_area.height.saturating_sub(1),
+            };
             (h, g)
         } else {
             (help_area, help_area)
@@ -1314,8 +1334,8 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
             let x1 = ((e_min as u32) * (rect.width as u32) / 1440) as usize;
             let x0 = x0.min(w.saturating_sub(1));
             let x1 = x1.min(w.saturating_sub(1)).max(x0);
-            for x in x0..=x1 {
-                cells[x] = Some(cat_color);
+            for cell in cells.iter_mut().take(x1 + 1).skip(x0) {
+                *cell = Some(cat_color);
             }
         }
     }
