@@ -1108,7 +1108,7 @@ pub fn help_items_for(app: &App) -> Vec<String> {
     match app.view() {
         View::Today => {
             items.push(format!("{}: start/pause", join(&km.start_or_resume)));
-            items.push(format!("{}: popup", join(&km.popup)));
+            items.push(format!("{}: time", join(&km.popup)));
             items.push(format!("{}: finish", join(&km.finish_active)));
             // Interrupt: reflect configured keys
             items.push(format!("{}: interrupt", join(&km.add_interrupt)));
