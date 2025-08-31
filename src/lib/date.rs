@@ -42,3 +42,49 @@ fn parse_ymd_override(s: &str) -> Option<u32> {
 fn ymd_to_u32(y: i32, m: u32, d: u32) -> u32 {
     (y as u32) * 10000 + m * 100 + d
 }
+
+/// Add `days` to a `YYYYMMDD` date, returning `YYYYMMDD`.
+/// Negative `days` subtracts. Panics if input is invalid.
+pub fn add_days_to_ymd(ymd: u32, days: i32) -> u32 {
+    let y = (ymd / 10000) as i32;
+    let m = ymd / 100 % 100;
+    let d = ymd % 100;
+    let date = NaiveDate::from_ymd_opt(y, m, d).expect("valid ymd");
+    let new = date
+        .checked_add_signed(chrono::Duration::days(days as i64))
+        .expect("date add within range");
+    ymd_to_u32(new.year(), new.month(), new.day())
+}
+
+/// Format `YYYYMMDD` to `YYYY-MM-DD`.
+pub fn format_ymd(ymd: u32) -> String {
+    let y = (ymd / 10000) as i32;
+    let m = ymd / 100 % 100;
+    let d = ymd % 100;
+    format!("{:04}-{:02}-{:02}", y, m, d)
+}
+
+/// Return English short weekday for a given `YYYYMMDD` (e.g., "Mon").
+pub fn weekday_short_en(ymd: u32) -> &'static str {
+    let y = (ymd / 10000) as i32;
+    let m = ymd / 100 % 100;
+    let d = ymd % 100;
+    let date = NaiveDate::from_ymd_opt(y, m, d).expect("valid ymd");
+    match date.weekday() {
+        chrono::Weekday::Mon => "Mon",
+        chrono::Weekday::Tue => "Tue",
+        chrono::Weekday::Wed => "Wed",
+        chrono::Weekday::Thu => "Thu",
+        chrono::Weekday::Fri => "Fri",
+        chrono::Weekday::Sat => "Sat",
+        chrono::Weekday::Sun => "Sun",
+    }
+}
+
+/// Validate a `YYYYMMDD` value.
+pub fn is_valid_ymd(ymd: u32) -> bool {
+    let y = (ymd / 10000) as i32;
+    let m = ymd / 100 % 100;
+    let d = ymd % 100;
+    NaiveDate::from_ymd_opt(y, m, d).is_some()
+}

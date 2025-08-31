@@ -30,6 +30,7 @@
 - Navigate: `↑/↓` または `j/k`
 - Reorder: `[` / `]`
 - Edit Estimate: `e`（±5m ステッパー）
+  - Date Picker: `.` で +1 日、`,` で −1 日（今日より前にはならない）。Date 行に曜日付きで表示（例: `Today (Wed)` / `YYYY-MM-DD (Fri)`）。マウスは `<`/`>` クリックで変更可能。
 - Postpone（翌日へ）: `p`
 - Bring from Future: `b`
 - New Task: `i`（入力モード）

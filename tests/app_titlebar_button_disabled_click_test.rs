@@ -43,4 +43,3 @@ fn delete_click_is_ignored_on_future_view() {
     app.handle_mouse_event(click_at(boxes[4]), area);
     assert!(!app.is_confirm_delete());
 }
-

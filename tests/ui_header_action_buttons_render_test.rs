@@ -7,14 +7,7 @@ fn header_action_buttons_line_contains_five_buttons_with_styles() {
     let line = ui::header_action_buttons_line(&app);
 
     // Labels are short: "New", "Start", "Stop", "Finish", "Delete"
-    let find = |name: &str| {
-        line
-            .spans
-            .iter()
-            .find(|s| s.content.as_ref() == name)
-            .unwrap()
-            .clone()
-    };
+    let find = |name: &str| line.spans.iter().find(|s| s.content.as_ref() == name).unwrap().clone();
 
     let new = find("New");
     assert!(new.style.add_modifier.contains(Modifier::BOLD));

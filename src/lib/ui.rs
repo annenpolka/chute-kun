@@ -99,7 +99,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(help, chunks[help_idx]);
     }
 
-    // Overlay: centered estimate editor popup (slider + OK/Cancel)
+    // Overlay: centered estimate editor popup (date + slider + OK/Cancel)
     if let Some(popup) = compute_estimate_popup_rect(app, area) {
         let border = Style::default().fg(Color::Yellow);
         let title_line =
@@ -117,6 +117,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             Paragraph::new(Span::styled(msg, Style::default().fg(Color::Yellow))),
             msg_rect,
         );
+        if let Some(t) = app.day.tasks.get(app.selected_index()) {
+            render_date_line(f, app, popup, inner, Color::Yellow, t.planned_ymd);
+        }
         let (track, ok, cancel) = estimate_slider_hitboxes(app, popup);
         render_slider_line(f, track, app.selected_estimate().unwrap_or(0));
         let btn_y = ok.y;
@@ -259,6 +262,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             Paragraph::new(Span::styled(msg, Style::default().fg(Color::Green))),
             msg_rect,
         );
+        if let Some(ymd) = app.new_task_planned_ymd() {
+            render_date_line(f, app, popup, inner, Color::Green, ymd);
+        }
         // Slider track
         let (track, _ok, _cancel) = estimate_slider_hitboxes(app, popup);
         render_slider_line(f, track, cur_est);
@@ -767,7 +773,13 @@ pub fn header_action_buttons_hitboxes(area: Rect) -> Vec<Rect> {
 pub fn header_action_button_labels() -> Vec<String> {
     // Keep labels short to avoid overlapping the left stats header on narrow terminals.
     // Keyboard shortcuts remain documented in the help line.
-    vec!["New".to_string(), "Start".to_string(), "Stop".to_string(), "Finish".to_string(), "Delete".to_string()]
+    vec![
+        "New".to_string(),
+        "Start".to_string(),
+        "Stop".to_string(),
+        "Finish".to_string(),
+        "Delete".to_string(),
+    ]
 }
 
 /// Enabled state for each header button (New, Start, Stop, Finish, Delete).
@@ -780,7 +792,9 @@ pub fn header_action_button_enabled(app: &App) -> [bool; 5] {
             .day
             .tasks
             .get(app.selected_index())
-            .map(|t| matches!(t.state, crate::task::TaskState::Paused | crate::task::TaskState::Planned))
+            .map(|t| {
+                matches!(t.state, crate::task::TaskState::Paused | crate::task::TaskState::Planned)
+            })
             .unwrap_or(false);
     let has_active = on_today && app.day.active_index().is_some();
     let can_finish = on_today && has_today;
@@ -872,6 +886,12 @@ pub fn help_items_for(app: &App) -> Vec<String> {
                 items.push(format!("{}/{}", d, u));
             } else {
                 items.push("j/k".to_string());
+            }
+            // Date picker hints only while date popups are open
+            if app.is_estimate_editing() || app.is_new_task_estimate() {
+                items.push(".: +1 day".to_string());
+                items.push(",: -1 day".to_string());
+                items.push("click < >: date".to_string());
             }
         }
         View::Past => {
@@ -1034,23 +1054,29 @@ pub fn compute_estimate_popup_rect(app: &App, area: Rect) -> Option<Rect> {
     let inner = block.inner(area);
     let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
     let msg = format!("Estimate: {}m — {}", app.selected_estimate().unwrap_or(0), title);
-    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let content_w = (UnicodeWidthStr::width(msg.as_str()).max(date_line_min_width().into()) as u16)
+        .saturating_add(0);
     let popup_w = content_w.saturating_add(4).min(inner.width).max(34).min(inner.width);
-    let popup_h: u16 = 5; // message + slider + buttons line
+    let popup_h: u16 = 6; // message + date + slider + buttons line
     let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
     let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
     Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
 }
 
 // Slider hitboxes for estimate editor
-pub fn estimate_slider_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
+pub fn estimate_slider_hitboxes(app: &App, popup: Rect) -> (Rect, Rect, Rect) {
     let inner = Rect {
         x: popup.x + 1,
         y: popup.y + 1,
         width: popup.width.saturating_sub(2),
         height: popup.height.saturating_sub(2),
     };
-    let track_y = inner.y + 1;
+    // In estimate popups, one extra line (date) is above the slider
+    let track_y = if app.is_new_task_estimate() || app.is_estimate_editing() {
+        inner.y + 2
+    } else {
+        inner.y + 1
+    };
     let track =
         Rect { x: inner.x + 2, y: track_y, width: inner.width.saturating_sub(4), height: 1 };
     let ok_w = UnicodeWidthStr::width("OK") as u16;
@@ -1117,9 +1143,11 @@ pub fn compute_new_task_estimate_popup_rect(app: &App, area: Rect) -> Option<Rec
     } else {
         format!("Estimate: {}m — {}", est, title)
     };
-    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let content_w = (UnicodeWidthStr::width(msg.as_str()).max(date_line_min_width().into()) as u16)
+        .saturating_add(0);
     let popup_w = content_w.saturating_add(4).min(inner.width).max(34).min(inner.width);
-    let popup_h: u16 = 5;
+    // Include: message, date, slider, buttons (inner height 4)
+    let popup_h: u16 = 6;
     let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
     let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
     Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
@@ -1183,6 +1211,102 @@ pub fn command_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
 
 // note: helpers that parsed message text for positions were removed in favor of
 // explicit hitbox geometry to reduce dead code and simplify clippy compliance.
+
+fn date_label_for(ymd: u32) -> String {
+    let base = if crate::date::is_valid_ymd(ymd) { ymd } else { crate::date::today_ymd() };
+    let wd = crate::date::weekday_short_en(base);
+    if base == crate::date::today_ymd() {
+        format!("Today ({})", wd)
+    } else if base == crate::date::add_days_to_ymd(crate::date::today_ymd(), 1) {
+        format!("Tomorrow ({})", wd)
+    } else {
+        format!("{} ({})", crate::date::format_ymd(base), wd)
+    }
+}
+
+fn date_line_min_width() -> u16 {
+    use unicode_width::UnicodeWidthStr as UW;
+    let w1 = UW::width("Date: Today (Wed)") as u16;
+    let w2 = UW::width("Date: Tomorrow (Wed)") as u16;
+    let w3 = UW::width("Date: 2099-12-31 (Wed)") as u16;
+    w1.max(w2).max(w3)
+}
+
+/// Return hitboxes for the date picker line: (prev_btn, label, next_btn).
+/// The line lives at `inner.y + 1` in both estimate popups.
+pub fn date_picker_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
+    let inner = Rect {
+        x: popup.x + 1,
+        y: popup.y + 1,
+        width: popup.width.saturating_sub(2),
+        height: popup.height.saturating_sub(2),
+    };
+    let y = inner.y + 1; // date line
+                         // Stable anchors: fixed buttons so mouse targets do not move with label width
+    let prev = Rect { x: inner.x + 2, y, width: 1, height: 1 };
+    let next = Rect { x: inner.x + inner.width.saturating_sub(3), y, width: 1, height: 1 };
+    // Label fills the space between prev and next minus single spaces around it
+    let label_x = prev.x + 2; // "< " then label
+    let label_w = next.x.saturating_sub(label_x).saturating_sub(1);
+    let label_rect = Rect { x: label_x, y, width: label_w, height: 1 };
+    (prev, label_rect, next)
+}
+
+fn render_date_line(f: &mut Frame, app: &App, popup: Rect, inner: Rect, color: Color, ymd: u32) {
+    let (prev, label_rect, next) = date_picker_hitboxes(app, popup);
+    let date_label = date_label_for(ymd);
+    let text = format!("Date: {}", date_label);
+    let mut spans: Vec<Span> = Vec::new();
+    // pad until prev
+    let left_pad = prev.x.saturating_sub(inner.x) as usize;
+    if left_pad > 0 {
+        spans.push(Span::raw(" ".repeat(left_pad)));
+    }
+    let prev_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DatePrev))
+    {
+        Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(color).add_modifier(Modifier::BOLD)
+    };
+    spans.push(Span::styled("<".to_string(), prev_style));
+    spans.push(Span::raw(" "));
+    // Fit label to available width
+    let fitted = fit_to_width(&text, label_rect.width as usize);
+    spans.push(Span::styled(fitted, Style::default().fg(color)));
+    // Compute spaces so that '>' appears at next.x
+    let printed_w = (UnicodeWidthStr::width(text.as_str()) as u16).min(label_rect.width);
+    let gap = next.x.saturating_sub(prev.x + 2 + printed_w) as usize;
+    if gap > 0 {
+        spans.push(Span::raw(" ".repeat(gap)));
+    }
+    let next_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DateNext))
+    {
+        Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(color).add_modifier(Modifier::BOLD)
+    };
+    spans.push(Span::styled(">".to_string(), next_style));
+    let date_rect = Rect { x: inner.x, y: label_rect.y, width: inner.width, height: 1 };
+    f.render_widget(Paragraph::new(Line::from(spans)), date_rect);
+}
+
+fn fit_to_width(s: &str, width: usize) -> String {
+    use unicode_width::UnicodeWidthChar;
+    if UnicodeWidthStr::width(s) <= width {
+        return s.to_string();
+    }
+    let mut out = String::new();
+    let mut used = 0usize;
+    for ch in s.chars() {
+        let w = ch.width().unwrap_or(1);
+        if used + w > width {
+            break;
+        }
+        out.push(ch);
+        used += w;
+    }
+    out
+}
 
 fn render_slider_line(f: &mut Frame, track: Rect, minutes: u16) {
     // Styled slider: [====●····]

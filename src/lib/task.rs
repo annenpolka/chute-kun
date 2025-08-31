@@ -36,6 +36,10 @@ pub struct Task {
     #[serde(default)]
     pub sessions: Vec<Session>,
     pub state: TaskState,
+    /// Planned date for the task (YYYYMMDD). Defaults to today on creation.
+    /// Used to support date selection on creation and postpone/bring operations.
+    #[serde(default)]
+    pub planned_ymd: u32,
     #[serde(default)]
     pub done_ymd: Option<u32>,
 }
@@ -51,6 +55,7 @@ impl Task {
             finished_at_min: None,
             sessions: Vec::new(),
             state: TaskState::Planned,
+            planned_ymd: crate::date::today_ymd(),
             done_ymd: None,
         }
     }
