@@ -1148,10 +1148,14 @@ pub fn help_items_for(app: &App) -> Vec<String> {
             }
         }
         View::Past => {
-            // Minimal: quit + switch view
+            // Minimal + category operations now available
+            items.push(format!("{}: category", join(&km.category_cycle)));
+            items.push(format!("{}: picker", join(&km.category_picker)));
         }
         View::Future => {
             items.push(format!("{}: bring", join(&km.bring_to_today)));
+            items.push(format!("{}: category", join(&km.category_cycle)));
+            items.push(format!("{}: picker", join(&km.category_picker)));
         }
     }
     items

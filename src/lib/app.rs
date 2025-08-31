@@ -642,8 +642,8 @@ impl App {
                     Some(Input { kind: InputKind::StartTimeEdit, buffer: initial.to_string() });
             }
             KeyCode::Char('c') => {
-                // Cycle category of the selected task (Today view only for now)
-                if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                // Cycle category of the selected task (all views)
+                if let Some(t) = self.selected_task_mut_current() {
                     use crate::task::Category as C;
                     t.category = match t.category {
                         C::General => C::Work,
@@ -933,7 +933,7 @@ impl App {
                 if ev.row == row_y && (ev.column == dot_x_main || ev.column == dot_x_drag) {
                     self.selected = idx;
                     use crate::task::Category as C;
-                    if let Some(t) = self.day.tasks.get_mut(idx) {
+                    if let Some(t) = self.selected_task_mut_current() {
                         t.category = match t.category {
                             C::General => C::Work,
                             C::Work => C::Home,
@@ -1125,7 +1125,7 @@ impl App {
                 }
             }
             A::CategoryCycle => {
-                if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                if let Some(t) = self.selected_task_mut_current() {
                     use crate::task::Category as C;
                     t.category = match t.category {
                         C::General => C::Work,
@@ -1136,8 +1136,10 @@ impl App {
                 }
             }
             A::CategoryPicker => {
-                if self.view == View::Today && !self.day.tasks.is_empty() {
-                    let idx = self.selected.min(self.day.tasks.len() - 1);
+                // Open picker for the current view if it has any items
+                let len = self.current_len();
+                if len > 0 {
+                    let idx = self.selected.min(len - 1);
                     self.open_category_picker_for(idx);
                 }
             }
@@ -1635,9 +1637,9 @@ impl App {
 
     fn apply_selected_category(&mut self) {
         use crate::task::Category as C;
-        let idx = self.selected.min(self.day.tasks.len().saturating_sub(1));
-        if let Some(t) = self.day.tasks.get_mut(idx) {
-            t.category = match self.cat_pick_idx {
+        let pick = self.cat_pick_idx;
+        if let Some(t) = self.selected_task_mut_current() {
+            t.category = match pick {
                 0 => C::General,
                 1 => C::Work,
                 2 => C::Home,
@@ -1649,9 +1651,14 @@ impl App {
 
     fn open_category_picker_for(&mut self, idx: usize) {
         self.selected = idx;
-        // Initialize picker index to current category position
+        // Initialize picker index to current category position for the active list
         use crate::task::Category as C;
-        let cur = self.day.tasks.get(idx).map(|t| t.category).unwrap_or(C::General);
+        let cur = match self.view {
+            View::Past => self.history.get(idx).map(|t| t.category),
+            View::Today => self.day.tasks.get(idx).map(|t| t.category),
+            View::Future => self.tomorrow.get(idx).map(|t| t.category),
+        }
+        .unwrap_or(C::General);
         self.cat_pick_idx = match cur {
             C::General => 0,
             C::Work => 1,
@@ -1659,6 +1666,14 @@ impl App {
             C::Hobby => 3,
         };
         self.input = Some(Input { kind: InputKind::CategoryPicker, buffer: String::new() });
+    }
+
+    fn selected_task_mut_current(&mut self) -> Option<&mut Task> {
+        match self.view {
+            View::Past => self.history.get_mut(self.selected),
+            View::Today => self.day.tasks.get_mut(self.selected),
+            View::Future => self.tomorrow.get_mut(self.selected),
+        }
     }
 
     fn index_from_list_row(&self, row: u16, list: Rect) -> usize {
