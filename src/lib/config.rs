@@ -727,18 +727,15 @@ pub fn write_day_start(h: u16, m: u16) -> Result<PathBuf> {
     Ok(path)
 }
 
-/// Expand simple placeholders in paths for convenience inside config:
-/// - Leading "~" expands to HOME (if available)
-/// - "${VAR}" expands using environment variable VAR; unknown vars become empty string
 /// Expand and validate `state_path` safely for convenience:
-/// - Whitelist env vars: HOME, XDG_DATA_HOME, XDG_STATE_HOME, XDG_CONFIG_HOME
-/// - Unknown ${VAR} ⇒ None (disable state_path instead of risky empty)
-/// - Leading '~' expands to HOME if set
-/// - Result must be absolute ⇒ else None
+///   - Whitelist env vars: HOME, XDG_DATA_HOME, XDG_STATE_HOME, XDG_CONFIG_HOME
+///   - Unknown ${VAR} ⇒ None (disable state_path instead of risky empty)
+///   - Leading '~' expands to HOME if set
+///   - Result must be absolute ⇒ else None
 fn expand_and_validate_state_path(input: &str) -> Option<PathBuf> {
     let allow_env = ["HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"];
     // ~ expansion first
-    let mut out = if let Some(rest) = input.strip_prefix('~') {
+    let out = if let Some(rest) = input.strip_prefix('~') {
         let home = std::env::var_os("HOME").map(PathBuf::from)?;
         let mut p = home;
         let rest = rest.strip_prefix('/').unwrap_or(rest);
@@ -769,5 +766,9 @@ fn expand_and_validate_state_path(input: &str) -> Option<PathBuf> {
         i += 1;
     }
     let p = PathBuf::from(result);
-    if p.is_absolute() { Some(p) } else { None }
+    if p.is_absolute() {
+        Some(p)
+    } else {
+        None
+    }
 }

@@ -20,10 +20,7 @@ state_path = "${XDG_DATA_HOME}/chute_kun/s1.toml"
     )
     .expect("parse config with var");
     assert_eq!(
-        cfg1
-            .state_path
-            .as_ref()
-            .expect("state_path present"),
+        cfg1.state_path.as_ref().expect("state_path present"),
         &home.join("chute_kun/s1.toml")
     );
 
@@ -36,10 +33,7 @@ state_path = "~/.local/share/chute_kun/s2.toml"
     )
     .expect("parse config with tilde");
     assert_eq!(
-        cfg2
-            .state_path
-            .as_ref()
-            .expect("state_path present"),
+        cfg2.state_path.as_ref().expect("state_path present"),
         &home.join(".local/share/chute_kun/s2.toml")
     );
 }

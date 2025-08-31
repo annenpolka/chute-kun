@@ -18,12 +18,7 @@ state_path = "/tmp/chute_kun_from_config/snapshot.toml"
     .expect("parse config with state_path");
 
     let cli_override = Some(PathBuf::from("/tmp/cli_override/snap.toml"));
-    let chosen = storage::resolve_state_path(&cfg, cli_override)
-        .expect("some path chosen");
+    let chosen = storage::resolve_state_path(&cfg, cli_override).expect("some path chosen");
 
-    assert_eq!(
-        chosen,
-        PathBuf::from("/tmp/chute_kun_from_config/snapshot.toml")
-    );
+    assert_eq!(chosen, PathBuf::from("/tmp/chute_kun_from_config/snapshot.toml"));
 }
-
