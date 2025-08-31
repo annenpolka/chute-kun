@@ -476,13 +476,8 @@ fn render_list_slice(now_min: u16, app: &App, tasks: &[crate::task::Task]) -> Ve
         .iter()
         .map(|t| {
             let this = cursor;
-            // remaining/planned minutes for this task (ignore partial seconds).
-            // - Done: use estimate to keep planned schedule consistent with original plan
-            // - Others: use remaining = estimate - actual
-            let delta = match t.state {
-                TaskState::Done => t.estimate_min,
-                _ => t.estimate_min.saturating_sub(t.actual_min),
-            };
+            // PlanはACTに影響されない: 常に見積(estimate)で次の開始時刻を押し出す
+            let delta = t.estimate_min;
             cursor = cursor.saturating_add(delta);
             this
         })
@@ -551,10 +546,8 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         .iter()
         .map(|t| {
             let this = cursor;
-            let delta = match t.state {
-                TaskState::Done => t.estimate_min,
-                _ => t.estimate_min.saturating_sub(t.actual_min),
-            };
+            // Planは常に見積ベース。経過ACTで短縮しない。
+            let delta = t.estimate_min;
             cursor = cursor.saturating_add(delta);
             this
         })
