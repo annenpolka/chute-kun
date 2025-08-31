@@ -47,7 +47,14 @@ pub fn draw(f: &mut Frame, app: &App) {
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    help_height = help_height.max(1);
+    // Ensure at least three lines (gauge + labels + help) when space allows
+    help_height = if max_help >= 3 {
+        help_height.max(3)
+    } else if max_help >= 2 {
+        help_height.max(2)
+    } else {
+        help_height.max(1)
+    };
 
     // Split inner area: tabs, optional banner, task list, help block.
     // Use Min(0) for the list so rendering can gracefully degrade in tiny terminals.
@@ -503,7 +510,13 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    help_height = help_height.max(1);
+    help_height = if max_help >= 3 {
+        help_height.max(3)
+    } else if max_help >= 2 {
+        help_height.max(2)
+    } else {
+        help_height.max(1)
+    };
     let mut constraints: Vec<Constraint> = vec![Constraint::Length(1)];
     if active_banner.is_some() {
         constraints.push(Constraint::Length(1));
@@ -1883,8 +1896,15 @@ pub fn compute_layout(app: &App, area: Rect) -> (Rect, Option<Rect>, Rect, Rect)
     if max_help > 0 {
         help_height = help_height.min(max_help);
     }
-    // Ensure at least two lines for gauge+help when space allows; otherwise keep at least one
-    help_height = if max_help >= 2 { help_height.max(2) } else { help_height.max(1) };
+    // Ensure at least three lines (gauge + labels + help) when space allows;
+    // otherwise keep at least two (gauge + help) or one (help only).
+    help_height = if max_help >= 3 {
+        help_height.max(3)
+    } else if max_help >= 2 {
+        help_height.max(2)
+    } else {
+        help_height.max(1)
+    };
     let tabs = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
     let mut y = inner.y + 1;
     let banner = if has_banner {
