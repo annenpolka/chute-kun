@@ -217,6 +217,41 @@ impl DayPlan {
         index - 1
     }
 
+    /// Move task from `from` index to logical position `to` (clamped to list bounds).
+    /// Returns the new index of the moved task. Adjusts `active` pointer accordingly.
+    pub fn move_index(&mut self, from: usize, to_slot: usize) -> usize {
+        let len = self.tasks.len();
+        if len == 0 || from >= len {
+            return from;
+        }
+        // Allow insertion at end by accepting to_slot == len
+        let slot = to_slot.min(len);
+        // Desired final index after move in the resulting vector
+        let dest_final = if from < slot { slot - 1 } else { slot };
+        if dest_final == from {
+            return from;
+        }
+        let item = self.tasks.remove(from);
+        self.tasks.insert(dest_final, item);
+        // Fix active pointer relative to move span
+        if let Some(a) = self.active.as_mut() {
+            if *a == from {
+                *a = dest_final;
+            } else if from < dest_final {
+                // [from+1 ..= dest_final] shifted left by 1
+                if *a > from && *a <= dest_final {
+                    *a = a.saturating_sub(1);
+                }
+            } else {
+                // [dest_final .. from-1] shifted right by 1
+                if *a >= dest_final && *a < from {
+                    *a = a.saturating_add(1);
+                }
+            }
+        }
+        dest_final
+    }
+
     pub fn adjust_estimate(&mut self, index: usize, delta_min: i16) {
         if let Some(t) = self.tasks.get_mut(index) {
             let cur = t.estimate_min as i16 + delta_min;

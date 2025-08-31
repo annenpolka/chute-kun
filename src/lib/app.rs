@@ -47,6 +47,10 @@ pub struct App {
     hovered_tab: Option<usize>,
     popup_hover: Option<PopupButton>,
     last_click: Option<LastClick>,
+    // Drag state for list reordering
+    drag_from: Option<usize>,
+    // Pulse toggle for simple UI animation effects
+    pulse: bool,
     // Two-step task creation: after title input, prompt for estimate
     new_task: Option<NewTaskDraft>,
 }
@@ -249,6 +253,8 @@ impl App {
             hovered_tab: None,
             popup_hover: None,
             last_click: None,
+            drag_from: None,
+            pulse: false,
             new_task: None,
         }
     }
@@ -559,14 +565,21 @@ impl App {
                     // View change can shift list area (different banner/help height). Re-align hover
                     let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
                     self.update_hover_from_coords(ev.column, ev.row, list2);
+                    self.drag_from = None;
                     return;
                 }
                 // List click (ignore header at list.y)
                 if ev.row <= list.y || ev.row >= list.y.saturating_add(list.height) {
+                    self.drag_from = None;
                     return;
                 }
                 let idx = self.index_from_list_row(ev.row, list);
                 self.selected = idx;
+                // Begin potential drag reorder in Today/Future lists
+                self.drag_from = match self.view {
+                    View::Today | View::Future => Some(idx),
+                    View::Past => None,
+                };
                 // Detect double-click
                 let now = Instant::now();
                 const THRESHOLD_MS: u128 = 600;
@@ -576,7 +589,14 @@ impl App {
                         if index == idx && now.duration_since(when).as_millis() <= THRESHOLD_MS
                 );
                 if is_double {
-                    self.toggle_task_start_pause(idx);
+                    match self.view {
+                        View::Today => self.toggle_task_start_pause(idx),
+                        View::Future => {
+                            // Bring from Future to Today but do not auto-start
+                            self.bring_selected_from_future();
+                        }
+                        View::Past => {}
+                    }
                     // Reset so the second Down of the pair doesn't trigger again
                     self.last_click = None;
                 } else {
@@ -587,6 +607,30 @@ impl App {
                 // Recompute hover using the current coordinates against the new layout.
                 let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
                 self.update_hover_from_coords(ev.column, ev.row, list2);
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                // While dragging, update hover to provide visual guidance
+                self.update_hover_from_coords(ev.column, ev.row, list);
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                // Finalize a drag-reorder if one started inside the list
+                if let Some(from) = self.drag_from.take() {
+                    // Compute drop target from current row; insert after the hovered row
+                    // when dragging downward, and before when dragging upward.
+                    let hover = self.index_from_list_row(ev.row, list);
+                    let slot = if from < hover { hover.saturating_add(1) } else { hover };
+                    match self.view {
+                        View::Today => {
+                            let new = self.day.move_index(from, slot);
+                            self.selected = new;
+                        }
+                        View::Future => {
+                            let new = self.move_future_index(from, slot);
+                            self.selected = new;
+                        }
+                        View::Past => {}
+                    }
+                }
             }
             MouseEventKind::Down(MouseButton::Right) => {
                 // Right click opens estimate editor on the clicked row (ignore header)
@@ -888,6 +932,19 @@ impl App {
     pub fn hovered_index(&self) -> Option<usize> {
         self.hovered
     }
+    pub fn is_dragging(&self) -> bool {
+        self.drag_from.is_some()
+    }
+    pub fn drag_source_index(&self) -> Option<usize> {
+        if self.view == View::Today {
+            self.drag_from
+        } else {
+            None
+        }
+    }
+    pub fn pulse_on(&self) -> bool {
+        self.pulse
+    }
     pub fn hovered_tab_index(&self) -> Option<usize> {
         self.hovered_tab
     }
@@ -919,6 +976,10 @@ impl App {
         // Freeze app time updates while a confirmation popup is open
         if self.is_confirm_delete() {
             return;
+        }
+        // Simple pulse animation toggle
+        if seconds > 0 {
+            self.pulse = !self.pulse;
         }
         // Sweep when the local date changes
         let today = today_ymd();
@@ -1070,6 +1131,25 @@ impl App {
         } else {
             self.hovered = None;
         }
+    }
+}
+
+impl App {
+    /// Reorder tasks within the Future (tomorrow) list using an insertion slot model.
+    /// Returns the final index of the moved task in the Future list.
+    fn move_future_index(&mut self, from: usize, to_slot: usize) -> usize {
+        let len = self.tomorrow.len();
+        if len == 0 || from >= len {
+            return from;
+        }
+        let slot = to_slot.min(len);
+        let dest_final = if from < slot { slot.saturating_sub(1) } else { slot };
+        if dest_final == from {
+            return from;
+        }
+        let item = self.tomorrow.remove(from);
+        self.tomorrow.insert(dest_final, item);
+        dest_final
     }
 }
 
