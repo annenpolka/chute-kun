@@ -39,6 +39,8 @@ pub struct KeyMap {
     pub select_up: Vec<KeySpec>,
     pub select_down: Vec<KeySpec>,
     pub toggle_blocks: Vec<KeySpec>,
+    pub category_cycle: Vec<KeySpec>,
+    pub category_picker: Vec<KeySpec>,
 }
 
 impl Default for KeyMap {
@@ -63,6 +65,8 @@ impl Default for KeyMap {
             select_up: vec![k("Up"), k("k")],
             select_down: vec![k("Down"), k("j")],
             toggle_blocks: vec![k("t")],
+            category_cycle: vec![k("c")],
+            category_picker: vec![k("C")],
         }
     }
 }
@@ -86,6 +90,8 @@ pub enum Action {
     SelectUp,
     SelectDown,
     ToggleBlocks,
+    CategoryCycle,
+    CategoryPicker,
 }
 
 impl KeyMap {
@@ -125,6 +131,10 @@ impl KeyMap {
             Some(Action::SelectDown)
         } else if matches(&self.toggle_blocks) {
             Some(Action::ToggleBlocks)
+        } else if matches(&self.category_cycle) {
+            Some(Action::CategoryCycle)
+        } else if matches(&self.category_picker) {
+            Some(Action::CategoryPicker)
         } else {
             None
         }
@@ -256,6 +266,8 @@ struct RawKeys {
     select_up: Option<OneOrMany>,
     select_down: Option<OneOrMany>,
     toggle_blocks: Option<OneOrMany>,
+    category_cycle: Option<OneOrMany>,
+    category_picker: Option<OneOrMany>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -352,6 +364,12 @@ impl Config {
             if let Some(v) = keys.toggle_blocks {
                 apply(&mut km.toggle_blocks, v)?;
             }
+            if let Some(v) = keys.category_cycle {
+                apply(&mut km.category_cycle, v)?;
+            }
+            if let Some(v) = keys.category_picker {
+                apply(&mut km.category_picker, v)?;
+            }
             cfg.keys = km;
         }
         Ok(cfg)
@@ -413,6 +431,8 @@ view_prev = "BackTab"
 select_up = ["Up", "k"]
 select_down = ["Down", "j"]
 toggle_blocks = "t"
+category_cycle = "c"
+category_picker = "C"
 "#.to_string()
     }
 

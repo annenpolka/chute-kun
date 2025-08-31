@@ -64,6 +64,8 @@ pub struct App {
     new_task: Option<NewTaskDraft>,
     // Header (title-bar) UI hover state
     hovered_header_btn: Option<HeaderButton>,
+    // Category picker selection index when open
+    cat_pick_idx: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +76,7 @@ enum InputKind {
     EstimateEdit,
     NewTaskEstimate,
     ConfirmDelete,
+    CategoryPicker,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -252,6 +255,33 @@ impl App {
                     _ => {}
                 }
             }
+        } else if self.is_category_picker() {
+            if let Some(popup) = crate::ui::compute_category_popup_rect(self, area) {
+                let rows = crate::ui::category_picker_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        for (i, r) in rows.iter().enumerate() {
+                            if point_in_rect(pos.0, pos.1, *r) {
+                                self.cat_pick_idx = i;
+                                break;
+                            }
+                        }
+                    }
+                    MouseEventKind::Down(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        for (i, r) in rows.iter().enumerate() {
+                            if point_in_rect(pos.0, pos.1, *r) {
+                                self.cat_pick_idx = i;
+                                self.apply_selected_category();
+                                self.input = None;
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         } else if self.in_input_mode() && !self.is_command_mode() {
             // Task name input (Normal/Interrupt)
             if let Some(popup) = crate::ui::compute_input_popup_rect(self, area) {
@@ -311,6 +341,7 @@ impl App {
             pulse: false,
             new_task: None,
             hovered_header_btn: None,
+            cat_pick_idx: 0,
         }
     }
 
@@ -433,6 +464,26 @@ impl App {
                     KeyCode::Char(c) => input.buffer.push(c),
                     _ => {}
                 },
+                InputKind::CategoryPicker => match code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if self.cat_pick_idx > 0 {
+                            self.cat_pick_idx -= 1;
+                        }
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if self.cat_pick_idx < 3 {
+                            self.cat_pick_idx += 1;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        self.apply_selected_category();
+                        self.input = None;
+                    }
+                    KeyCode::Esc => {
+                        self.input = None;
+                    }
+                    _ => {}
+                },
                 InputKind::EstimateEdit => match code {
                     KeyCode::Enter | KeyCode::Esc => {
                         // finish editing
@@ -505,6 +556,18 @@ impl App {
             }
             KeyCode::Char('t') => {
                 self.toggle_display_mode();
+            }
+            KeyCode::Char('c') => {
+                // Cycle category of the selected task (Today view only for now)
+                if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                    use crate::task::Category as C;
+                    t.category = match t.category {
+                        C::General => C::Work,
+                        C::Work => C::Home,
+                        C::Home => C::Hobby,
+                        C::Hobby => C::General,
+                    };
+                }
             }
             KeyCode::Char(':') => {
                 // Open command palette
@@ -646,7 +709,7 @@ impl App {
     /// - Mouse move updates hover index.
     /// - Ignores clicks while in input/popup modes.
     pub fn handle_mouse_event(&mut self, ev: MouseEvent, area: Rect) {
-        if self.in_input_mode() || self.is_confirm_delete() {
+        if self.in_input_mode() || self.is_confirm_delete() || self.is_estimate_editing() || self.is_new_task_estimate() || self.is_command_mode() || self.is_category_picker() {
             self.handle_mouse_in_popup(ev, area);
             return;
         }
@@ -774,6 +837,29 @@ impl App {
                     return;
                 }
                 let idx = self.index_from_list_row(ev.row, list);
+                // Category dot hit detection inside Task column (restrict to exact row Y)
+                // Columns: Plan(5) | Est(4) | Task | Act | Actual; spacing = 1 between columns
+                let task_x0 = list.x.saturating_add(5 + 1 + 4 + 1);
+                let dot_x_main = task_x0.saturating_add(2);
+                let dot_x_drag = task_x0.saturating_add(4);
+                let row_y = list.y.saturating_add(1).saturating_add(idx as u16);
+                if ev.row == row_y && (ev.column == dot_x_main || ev.column == dot_x_drag) {
+                    self.selected = idx;
+                    use crate::task::Category as C;
+                    if let Some(t) = self.day.tasks.get_mut(idx) {
+                        t.category = match t.category {
+                            C::General => C::Work,
+                            C::Work => C::Home,
+                            C::Home => C::Hobby,
+                            C::Hobby => C::General,
+                        };
+                    }
+                    // Don't treat as part of a double-click
+                    self.last_click = None;
+                    let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                    self.update_hover_from_coords(ev.column, ev.row, list2);
+                    return;
+                }
                 self.selected = idx;
                 // Begin potential drag reorder in Today/Future lists
                 self.drag_from = match self.view {
@@ -838,6 +924,17 @@ impl App {
                     return;
                 }
                 let idx = self.index_from_list_row(ev.row, list);
+                // If right-click is on the category dot of that exact row, open picker
+                let task_x0 = list.x.saturating_add(5 + 1 + 4 + 1);
+                let row_y = list.y.saturating_add(1).saturating_add(idx as u16);
+                let dot_x_main = task_x0.saturating_add(2);
+                let dot_x_drag = task_x0.saturating_add(4);
+                if ev.row == row_y && (ev.column == dot_x_main || ev.column == dot_x_drag) {
+                    self.open_category_picker_for(idx);
+                    let (_t2, _b2, list2, _h2) = crate::ui::compute_layout(self, area);
+                    self.update_hover_from_coords(ev.column, ev.row, list2);
+                    return;
+                }
                 self.selected = idx;
                 if !self.day.tasks.is_empty() {
                     if let Some(t) = self.day.tasks.get_mut(self.selected) {
@@ -938,6 +1035,23 @@ impl App {
                     self.display = DisplayMode::List;
                 } else {
                     self.should_quit = true;
+                }
+            }
+            A::CategoryCycle => {
+                if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                    use crate::task::Category as C;
+                    t.category = match t.category {
+                        C::General => C::Work,
+                        C::Work => C::Home,
+                        C::Home => C::Hobby,
+                        C::Hobby => C::General,
+                    };
+                }
+            }
+            A::CategoryPicker => {
+                if self.view == View::Today && !self.day.tasks.is_empty() {
+                    let idx = self.selected.min(self.day.tasks.len() - 1);
+                    self.open_category_picker_for(idx);
                 }
             }
             A::AddTask => {
@@ -1148,6 +1262,9 @@ impl App {
     pub fn is_confirm_delete(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::ConfirmDelete))
     }
+    pub fn is_category_picker(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::CategoryPicker))
+    }
     /// True only when typing a task title (Normal/Interrupt), not for estimate/confirm popups.
     pub fn is_text_input_mode(&self) -> bool {
         matches!(
@@ -1191,6 +1308,9 @@ impl App {
     }
     pub fn hovered_header_button(&self) -> Option<HeaderButton> {
         self.hovered_header_btn
+    }
+    pub fn category_pick_index(&self) -> usize {
+        self.cat_pick_idx
     }
 
     fn set_view(&mut self, v: View) {
@@ -1402,6 +1522,39 @@ impl App {
             self.day.start(idx);
             self.selected = idx;
         }
+    }
+
+    fn apply_selected_category(&mut self) {
+        use crate::task::Category as C;
+        let idx = self.selected.min(self.day.tasks.len().saturating_sub(1));
+        if let Some(t) = self.day.tasks.get_mut(idx) {
+            t.category = match self.cat_pick_idx {
+                0 => C::General,
+                1 => C::Work,
+                2 => C::Home,
+                3 => C::Hobby,
+                _ => C::General,
+            };
+        }
+    }
+
+    fn open_category_picker_for(&mut self, idx: usize) {
+        self.selected = idx;
+        // Initialize picker index to current category position
+        use crate::task::Category as C;
+        let cur = self
+            .day
+            .tasks
+            .get(idx)
+            .map(|t| t.category)
+            .unwrap_or(C::General);
+        self.cat_pick_idx = match cur {
+            C::General => 0,
+            C::Work => 1,
+            C::Home => 2,
+            C::Hobby => 3,
+        };
+        self.input = Some(Input { kind: InputKind::CategoryPicker, buffer: String::new() });
     }
 
     fn index_from_list_row(&self, row: u16, list: Rect) -> usize {

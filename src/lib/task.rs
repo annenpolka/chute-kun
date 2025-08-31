@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Category {
+    General,
+    Work,
+    Home,
+    Hobby,
+}
+
+impl Default for Category {
+    fn default() -> Self {
+        Category::General
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Session {
     pub start_min: u16,
     #[serde(default)]
@@ -42,6 +56,9 @@ pub struct Task {
     pub planned_ymd: u32,
     #[serde(default)]
     pub done_ymd: Option<u32>,
+    /// User classification for the task (e.g., Work/Home/Hobby). Defaults to General.
+    #[serde(default)]
+    pub category: Category,
 }
 
 impl Task {
@@ -57,6 +74,7 @@ impl Task {
             state: TaskState::Planned,
             planned_ymd: crate::date::today_ymd(),
             done_ymd: None,
+            category: Category::General,
         }
     }
 }
