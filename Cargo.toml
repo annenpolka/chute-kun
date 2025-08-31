@@ -10,9 +10,9 @@ repository = "https://github.com/annenpolka/chute-kun"
 homepage = "https://github.com/annenpolka/chute-kun"
 documentation = "https://docs.rs/chute_kun"
 readme = "README.md"
-keywords = ["tui", "cli", "ratatui", "todoist", "productivity"]
+keywords = ["tui", "cli", "taskchute", "time-tracking"]
 # Valid category slugs must come from https://crates.io/category_slugs
-categories = ["command-line-utilities"]
+categories = ["command-line-utilities", "date-and-time"]
 
 # Keep the published crate lean. Adjust as needed, but do not exclude README/LICENSE.
 exclude = [
