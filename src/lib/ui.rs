@@ -1349,6 +1349,12 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
             cells[x] = Some(Color::DarkGray);
         }
     }
+    // Overlay current time marker '^' in red, always on top
+    let x_now = ((now_min as u32) * (rect.width as u32) / 1440) as usize;
+    if x_now < w {
+        glyphs[x_now] = '^';
+        cells[x_now] = Some(Color::Red);
+    }
     // Compress into styled spans (by (glyph, color))
     let mut spans: Vec<Span> = Vec::new();
     let mut i = 0usize;
