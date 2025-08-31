@@ -1685,14 +1685,34 @@ impl App {
     }
 
     fn update_hover_from_coords(&mut self, col: u16, row: u16, list: Rect) {
-        // Only treat rows strictly below the header as list items
-        if row >= list.y.saturating_add(1)
-            && row < list.y.saturating_add(list.height)
-            && col >= list.x
-            && col < list.x + list.width
-        {
-            let idx = self.index_from_list_row(row, list);
-            self.hovered = Some(idx);
+        // Only treat rows strictly below the header as actual task rows in normal movement.
+        // While dragging, allow hover to extend into the tail space (snaps to last row) so
+        // users get a visible drop target at the end of the list.
+        let len = self.current_len() as u16;
+        if len == 0 {
+            self.hovered = None;
+            return;
+        }
+        let first_row_y = list.y.saturating_add(1);
+        let past_last_row_y = first_row_y.saturating_add(len); // exclusive upper bound
+        let within_cols = col >= list.x && col < list.x.saturating_add(list.width);
+        let within_list_block = row >= first_row_y && row < list.y.saturating_add(list.height);
+        let within_header = row >= list.y && row < first_row_y; // header line area
+        let within_task_rows = row >= first_row_y && row < past_last_row_y;
+
+        if within_cols {
+            if within_task_rows {
+                let idx = self.index_from_list_row(row, list);
+                self.hovered = Some(idx);
+            } else if self.drag_from.is_some() && within_list_block {
+                // Dragging in tail space: snap hover to last row for visual target
+                self.hovered = Some((len - 1) as usize);
+            } else if self.drag_from.is_some() && within_header {
+                // Dragging into head space (header): snap hover to first row
+                self.hovered = Some(0);
+            } else {
+                self.hovered = None;
+            }
         } else {
             self.hovered = None;
         }
