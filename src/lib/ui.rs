@@ -738,36 +738,66 @@ pub fn format_help_line() -> String {
 /// - Today: show full task actions
 /// - Past/Future: show only navigation and quit to reduce noise
 pub fn format_help_line_for(app: &App) -> String {
-    match app.view() {
-        View::Today => format_help_line(),
-        View::Past => "q: quit | Tab: switch view".to_string(),
-        View::Future => "q: quit | Tab: switch view | b: bring".to_string(),
-    }
+    // Build items using the same source as wrapped help
+    let items = help_items_for(app);
+    items.join(" | ")
 }
 
 /// Build help items depending on the current view. Used for wrapping.
-pub fn help_items_for(app: &App) -> Vec<&'static str> {
-    let mut items: Vec<&'static str> = vec!["q: quit", "Tab: switch view"];
-    if matches!(app.view(), View::Today) {
-        items.extend([
-            "Enter: start/resume",
-            "Space: pause",
-            "Shift+Enter/f: finish",
-            "i: interrupt",
-            "p: postpone",
-            "x: delete",
-            "[: up",
-            "]: down",
-            "e: edit",
-            "j/k",
-        ]);
+pub fn help_items_for(app: &App) -> Vec<String> {
+    use crate::config::join_key_labels as join;
+    let km = &app.config.keys;
+    let mut items: Vec<String> =
+        vec![format!("{}: quit", join(&km.quit)), format!("{}: switch view", join(&km.view_next))];
+    match app.view() {
+        View::Today => {
+            items.push(format!("{}: start/pause", join(&km.start_or_resume)));
+            items.push(format!("{}: pause", join(&km.pause)));
+            items.push(format!("{}: finish", join(&km.finish_active)));
+            // Interrupt: reflect configured keys
+            items.push(format!("{}: interrupt", join(&km.add_interrupt)));
+            items.push(format!("{}: postpone", join(&km.postpone)));
+            // delete key now configurable
+            items.push(format!("{}: delete", join(&km.delete)));
+            items.push(format!("{}: up", join(&km.reorder_up)));
+            items.push(format!("{}: down", join(&km.reorder_down)));
+            items.push(format!("{}: edit", join(&km.estimate_plus)));
+            // Compact vim-like navigation chars as trailing hint (if present)
+            let up_chars: Vec<char> = km
+                .select_up
+                .iter()
+                .filter_map(|k| match k.code {
+                    crossterm::event::KeyCode::Char(c) if k.modifiers.is_empty() => Some(c),
+                    _ => None,
+                })
+                .collect();
+            let down_chars: Vec<char> = km
+                .select_down
+                .iter()
+                .filter_map(|k| match k.code {
+                    crossterm::event::KeyCode::Char(c) if k.modifiers.is_empty() => Some(c),
+                    _ => None,
+                })
+                .collect();
+            if let (Some(d), Some(u)) = (down_chars.first(), up_chars.first()) {
+                items.push(format!("{}/{}", d, u));
+            } else {
+                items.push("j/k".to_string());
+            }
+        }
+        View::Past => {
+            // Minimal: quit + switch view
+        }
+        View::Future => {
+            items.push(format!("{}: bring", join(&km.bring_to_today)));
+        }
     }
     items
 }
 
 /// Wrap help items into lines that fit within `width` cells, inserting ` | ` between items.
 /// This uses Unicode width to count display cells.
-pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
+pub fn wrap_help_items_to_width(items: &[String], width: u16) -> Vec<String> {
     let width = width as usize;
     if width == 0 {
         return vec![String::new()];
@@ -775,9 +805,9 @@ pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut cur = String::new();
     let sep = " | ";
-    for item in items {
+    for item in items.iter() {
         if cur.is_empty() {
-            cur.push_str(item);
+            cur.push_str(item.as_str());
             continue;
         }
         let candidate = format!("{}{}{}", cur, sep, item);
@@ -786,7 +816,7 @@ pub fn wrap_help_items_to_width(items: &[&str], width: u16) -> Vec<String> {
         } else {
             // commit current line and start a new one
             lines.push(cur);
-            cur = (*item).to_string();
+            cur = item.to_string();
         }
     }
     if !cur.is_empty() {

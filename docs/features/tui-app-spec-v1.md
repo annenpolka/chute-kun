@@ -35,6 +35,13 @@
 
 （注）キーバインドは後続実装で微調整可。原則として片手操作と視線移動最小化を重視。
 
+### ヘルプ表示とキーバインド
+- 画面下部のヘルプ行は現在のコンフィグ（`config.toml`）のキーアサインを反映して表示されます。
+- 例: `finish_active = "g"` の場合、Today ビューでは `g: finish`。`view_next = "Ctrl+N"` の場合は表示が正規化され `Ctrl+n: switch view`。
+- 複数割り当ては `/` 区切りで表示: 例）`finish_active = ["Shift+Enter", "f"]` → `Shift+Enter/f: finish`。
+- Delete もコンフィグ可能（例: `delete = "Ctrl+d"` → `Ctrl+d: delete`）。
+- `BackTab` はヘルプ上は `Shift+Tab` として表示されます。設定は `BackTab`/`Shift+Tab` のどちらでも可。
+
 ## 状態遷移（タスク）
 - `planned → (start) → active → (pause) → paused → (resume) → active → (finish) → done`
 - 例外: `planned → (finish:記録のみ) → done`、`active → (drop) → planned|dropped`、`active → (interrupt) → paused`。

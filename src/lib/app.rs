@@ -792,6 +792,12 @@ impl App {
                 }
                 self.day.pause_active();
             }
+            A::Delete => {
+                if self.view == View::Today && !self.day.tasks.is_empty() {
+                    self.input =
+                        Some(Input { kind: InputKind::ConfirmDelete, buffer: String::new() });
+                }
+            }
             A::ReorderUp => {
                 let new = self.day.reorder_up(self.selected);
                 self.selected = new;

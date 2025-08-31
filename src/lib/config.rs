@@ -28,6 +28,7 @@ pub struct KeyMap {
     pub start_or_resume: Vec<KeySpec>,
     pub finish_active: Vec<KeySpec>,
     pub pause: Vec<KeySpec>,
+    pub delete: Vec<KeySpec>,
     pub reorder_up: Vec<KeySpec>,
     pub reorder_down: Vec<KeySpec>,
     pub estimate_plus: Vec<KeySpec>,
@@ -50,6 +51,7 @@ impl Default for KeyMap {
             start_or_resume: vec![k("Enter")],
             finish_active: vec![k("Shift+Enter"), k("f")],
             pause: vec![k("Space")],
+            delete: vec![k("x")],
             reorder_up: vec![k("[")],
             reorder_down: vec![k("]")],
             estimate_plus: vec![k("e")],
@@ -71,6 +73,7 @@ pub enum Action {
     StartOrResume,
     FinishActive,
     Pause,
+    Delete,
     ReorderUp,
     ReorderDown,
     EstimatePlus,
@@ -97,6 +100,8 @@ impl KeyMap {
             Some(Action::FinishActive)
         } else if matches(&self.pause) {
             Some(Action::Pause)
+        } else if matches(&self.delete) {
+            Some(Action::Delete)
         } else if matches(&self.reorder_up) {
             Some(Action::ReorderUp)
         } else if matches(&self.reorder_down) {
@@ -144,7 +149,7 @@ impl KeySpec {
                 other => return Err(anyhow!("unsupported modifier: {}", other)),
             }
         }
-        let code = match key_str {
+        let mut code = match key_str {
             "Enter" => KeyCode::Enter,
             "Space" => KeyCode::Char(' '),
             "Tab" => KeyCode::Tab,
@@ -155,12 +160,66 @@ impl KeySpec {
             s if s.len() == 1 => KeyCode::Char(s.chars().next().unwrap()),
             other => return Err(anyhow!("unsupported key: {}", other)),
         };
+        // Normalize Ctrl+letter to lowercase to be case-insensitive in configs
+        if mods.contains(KeyModifiers::CONTROL) {
+            if let KeyCode::Char(c) = code {
+                if c.is_ascii_alphabetic() {
+                    code = KeyCode::Char(c.to_ascii_lowercase());
+                }
+            }
+        }
         Ok(KeySpec { code, modifiers: mods })
     }
 
     pub fn matches(&self, ev: &KeyEvent) -> bool {
-        ev.code == self.code && ev.modifiers == self.modifiers
+        use KeyCode::*;
+        // Treat Shift+Tab and BackTab as equivalent across terminals
+        let (sc, sm) = (self.code, self.modifiers);
+        let (ec, em) = (ev.code, ev.modifiers);
+        let self_is_shift_tab = (sc == Tab && sm.contains(KeyModifiers::SHIFT)) || sc == BackTab;
+        let ev_is_shift_tab = (ec == Tab && em.contains(KeyModifiers::SHIFT)) || ec == BackTab;
+        if self_is_shift_tab && ev_is_shift_tab {
+            return true;
+        }
+        ec == sc && em == sm
     }
+
+    /// Human‑readable key label used in help text.
+    /// Examples: "q", "Enter", "Space", "Shift+Enter", "Ctrl+C", "Tab", "BackTab".
+    pub fn label(&self) -> String {
+        use KeyCode::*;
+        let base = match self.code {
+            Enter => "Enter".to_string(),
+            Tab => "Tab".to_string(),
+            BackTab => "Shift+Tab".to_string(),
+            Up => "Up".to_string(),
+            Down => "Down".to_string(),
+            KeyCode::Char(' ') => "Space".to_string(),
+            KeyCode::Char(c) => c.to_string(),
+            _ => format!("{:?}", self.code),
+        };
+        // Canonical modifier order: Shift, Ctrl, Alt
+        let mut parts: Vec<&'static str> = Vec::new();
+        if self.modifiers.contains(KeyModifiers::SHIFT) && self.code != BackTab {
+            parts.push("Shift");
+        }
+        if self.modifiers.contains(KeyModifiers::CONTROL) {
+            parts.push("Ctrl");
+        }
+        if self.modifiers.contains(KeyModifiers::ALT) {
+            parts.push("Alt");
+        }
+        if parts.is_empty() {
+            base
+        } else {
+            format!("{}+{}", parts.join("+"), base)
+        }
+    }
+}
+
+/// Join labels for multiple keys using '/' (e.g., "Shift+Enter/f").
+pub fn join_key_labels(keys: &[KeySpec]) -> String {
+    keys.iter().map(|k| k.label()).collect::<Vec<_>>().join("/")
 }
 
 // ----- Loading / Parsing -----
@@ -181,6 +240,7 @@ struct RawKeys {
     start_or_resume: Option<OneOrMany>,
     finish_active: Option<OneOrMany>,
     pause: Option<OneOrMany>,
+    delete: Option<OneOrMany>,
     reorder_up: Option<OneOrMany>,
     reorder_down: Option<OneOrMany>,
     estimate_plus: Option<OneOrMany>,
@@ -252,6 +312,9 @@ impl Config {
             }
             if let Some(v) = keys.pause {
                 apply(&mut km.pause, v)?;
+            }
+            if let Some(v) = keys.delete {
+                apply(&mut km.delete, v)?;
             }
             if let Some(v) = keys.reorder_up {
                 apply(&mut km.reorder_up, v)?;
@@ -330,6 +393,7 @@ add_interrupt = "I"
 start_or_resume = "Enter"
 finish_active = ["Shift+Enter", "f"]
 pause = "Space"
+delete = "x"
 reorder_up = "["
 reorder_down = "]"
 estimate_plus = "e"
