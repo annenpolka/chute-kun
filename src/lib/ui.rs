@@ -1314,8 +1314,9 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
         return;
     }
     let w = rect.width as usize;
-    // Prepare per-cell colors; default None means no work recorded
+    // Prepare per-cell colors and glyphs; default None means no work recorded
     let mut cells: Vec<Option<Color>> = vec![None; w];
+    let mut glyphs: Vec<char> = vec!['·'; w];
     // Gather all actual sessions for the current view's tasks
     let tasks_slice: Vec<crate::task::Task> = match app.view() {
         View::Past => app.history_tasks().clone(),
@@ -1334,22 +1335,34 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
             let x1 = ((e_min as u32) * (rect.width as u32) / 1440) as usize;
             let x0 = x0.min(w.saturating_sub(1));
             let x1 = x1.min(w.saturating_sub(1)).max(x0);
-            for cell in cells.iter_mut().take(x1 + 1).skip(x0) {
-                *cell = Some(cat_color);
+            for i in x0..=x1 {
+                cells[i] = Some(cat_color);
+                glyphs[i] = '█';
             }
         }
     }
-    // Compress into styled spans
+    // Overlay hour ticks every 60 minutes (only on empty cells to avoid hiding data)
+    for h in (0..=24).map(|h| h * 60) {
+        let x = ((h as u32) * (rect.width as u32) / 1440) as usize;
+        if x < w && cells[x].is_none() {
+            glyphs[x] = '|';
+            cells[x] = Some(Color::DarkGray);
+        }
+    }
+    // Compress into styled spans (by (glyph, color))
     let mut spans: Vec<Span> = Vec::new();
     let mut i = 0usize;
     while i < w {
-        let color = cells[i];
-        let j = ((i + 1)..=w).find(|&k| k == w || cells[k] != color).unwrap_or(w);
-        let len = j - i;
-        let sym = if color.is_some() { "█" } else { "·" };
-        let text = sym.repeat(len);
-        let style = match color {
-            Some(c) => Style::default().fg(c).add_modifier(Modifier::BOLD),
+        let g = glyphs[i];
+        let c = cells[i];
+        let mut j = i + 1;
+        while j < w && glyphs[j] == g && cells[j] == c {
+            j += 1;
+        }
+        let text: String = std::iter::repeat(g).take(j - i).collect();
+        let style = match c {
+            Some(color) if g == '|' => Style::default().fg(Color::DarkGray),
+            Some(color) => Style::default().fg(color).add_modifier(Modifier::BOLD),
             None => Style::default().fg(Color::DarkGray),
         };
         spans.push(Span::styled(text, style));
