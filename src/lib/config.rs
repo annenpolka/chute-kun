@@ -14,6 +14,8 @@ pub struct Config {
     pub day_start_minutes: u16,
     pub keys: KeyMap,
     pub categories: CategoryTheme,
+    /// Optional snapshot save path. When set, this takes precedence over CLI flags and env.
+    pub state_path: Option<PathBuf>,
 }
 
 impl Default for Config {
@@ -22,6 +24,7 @@ impl Default for Config {
             day_start_minutes: 9 * 60,
             keys: KeyMap::default(),
             categories: CategoryTheme::default(),
+            state_path: None,
         }
     }
 }
@@ -335,6 +338,8 @@ struct RawConfig {
     keys: Option<RawKeys>,
     #[serde(default)]
     categories: Option<RawCategories>,
+    #[serde(default)]
+    state_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -527,6 +532,15 @@ impl Config {
             apply(&mut cfg.categories.home, cats.home)?;
             apply(&mut cfg.categories.hobby, cats.hobby)?;
         }
+        // Top-level state_path with ${VAR} and ~ expansion (safe rules)
+        if let Some(sp) = raw.state_path {
+            if let Some(p) = expand_and_validate_state_path(&sp) {
+                cfg.state_path = Some(p);
+            } else {
+                // Unknown var or non-absolute result => ignore for safety/convenience
+                cfg.state_path = None;
+            }
+        }
         Ok(cfg)
     }
 
@@ -566,6 +580,11 @@ impl Config {
 
 # 1日の開始時刻（固定表示）。"HH:MM" 形式。既定は 09:00。
 day_start = "09:00"
+
+# 任意: スナップショットの保存先ファイルパス。
+# 指定すると、--state/CHUTE_KUN_STATE より優先されます。
+# ${VAR} と ~ を展開します（例: "${XDG_DATA_HOME}/chute_kun/snapshot.toml"）。
+# state_path = "${XDG_DATA_HOME}/chute_kun/snapshot.toml"
 
 [keys]
 # 既定のキーバインド。必要なものだけ上書きできます。
@@ -706,4 +725,50 @@ pub fn write_day_start(h: u16, m: u16) -> Result<PathBuf> {
     let updated = set_day_start_in_toml(&contents, &normalized);
     std::fs::write(&path, updated).context("write updated day_start to config")?;
     Ok(path)
+}
+
+/// Expand and validate `state_path` safely for convenience:
+///   - Whitelist env vars: HOME, XDG_DATA_HOME, XDG_STATE_HOME, XDG_CONFIG_HOME
+///   - Unknown ${VAR} ⇒ None (disable state_path instead of risky empty)
+///   - Leading '~' expands to HOME if set
+///   - Result must be absolute ⇒ else None
+fn expand_and_validate_state_path(input: &str) -> Option<PathBuf> {
+    let allow_env = ["HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"];
+    // ~ expansion first
+    let out = if let Some(rest) = input.strip_prefix('~') {
+        let home = std::env::var_os("HOME").map(PathBuf::from)?;
+        let mut p = home;
+        let rest = rest.strip_prefix('/').unwrap_or(rest);
+        p.push(rest);
+        p.to_string_lossy().to_string()
+    } else {
+        input.to_string()
+    };
+
+    // ${VAR} expansion — fail closed if var is not in whitelist or missing
+    let mut result = String::with_capacity(out.len());
+    let mut i = 0usize;
+    let bytes = out.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'$' && i + 1 < bytes.len() && bytes[i + 1] == b'{' {
+            if let Some(end) = out[i + 2..].find('}') {
+                let var_name = &out[i + 2..i + 2 + end];
+                if !allow_env.contains(&var_name) {
+                    return None;
+                }
+                let val = std::env::var(var_name).ok()?; // missing ⇒ None
+                result.push_str(&val);
+                i = i + 2 + end + 1;
+                continue;
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    let p = PathBuf::from(result);
+    if p.is_absolute() {
+        Some(p)
+    } else {
+        None
+    }
 }
