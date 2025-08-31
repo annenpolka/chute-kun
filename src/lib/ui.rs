@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Rect,
     prelude::*,
-    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
+    widgets::{block::Title, Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -25,7 +25,13 @@ const MIN_LIST_LINES: u16 = 3; // table header + at least two rows
 pub fn draw(f: &mut Frame, app: &App) {
     let area: Rect = f.area();
     let header_line = header_title_line(app_display_base(app), app);
-    let block = Block::default().title(header_line).borders(Borders::ALL);
+    let actions_line = header_action_buttons_line(app);
+    // Left stats + right action buttons in the title bar
+    let block = Block::default()
+        .title(header_line)
+        .title(Title::from(actions_line))
+        .title_alignment(Alignment::Right)
+        .borders(Borders::ALL);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -697,6 +703,89 @@ pub fn header_title_line(now_min: u16, app: &App) -> Line<'static> {
     line.spans.push(val(format!("{}m {}s", act_m, act_s), Color::Magenta));
 
     line
+}
+
+/// Right-aligned action buttons for the title bar: New | Start | Stop | Finish | Delete.
+/// Buttons render as bold, black-on-colored "pills" similar to other UI elements.
+pub fn header_action_buttons_line(app: &App) -> Line<'static> {
+    let hovered = app.hovered_header_button();
+    let labels = header_action_button_labels();
+    let enabled = header_action_button_enabled(app);
+    let colors = [Color::Green, Color::Blue, Color::Yellow, Color::Magenta, Color::Red];
+    let mut spans: Vec<Span> = Vec::new();
+    for i in 0..labels.len() {
+        let label = &labels[i];
+        let is_enabled = enabled[i];
+        let is_hover = matches!(
+            (i, hovered),
+            (0, Some(crate::app::HeaderButton::New))
+                | (1, Some(crate::app::HeaderButton::Start))
+                | (2, Some(crate::app::HeaderButton::Stop))
+                | (3, Some(crate::app::HeaderButton::Finish))
+                | (4, Some(crate::app::HeaderButton::Delete))
+        );
+        let style = if is_enabled {
+            let bg = if is_hover { Color::Cyan } else { colors[i] };
+            Style::default().fg(Color::Black).bg(bg).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        spans.push(Span::styled(label.clone(), style));
+        if i + 1 != labels.len() {
+            spans.push(Span::raw(" "));
+        }
+    }
+    Line::from(spans)
+}
+
+/// Compute hitboxes (terminal rectangles) for each header action button on the top border line.
+/// Returns boxes in the same order as rendering: [New, Start, Stop, Finish, Delete].
+/// Coordinates are relative to the full `area` passed to the app draw loop.
+pub fn header_action_buttons_hitboxes(area: Rect) -> Vec<Rect> {
+    // Available width for titles excludes the two corner cells.
+    let available = area.width.saturating_sub(2);
+    let labels = header_action_button_labels(); // include shortcut hints
+    let gaps = 4u16; // 4 spaces between 5 labels
+    let labels_w: u16 = labels.iter().map(|s| UnicodeWidthStr::width(s.as_str()) as u16).sum();
+    let total_w = labels_w + gaps;
+    // Start X for the right-aligned group: left corner + (available - total)
+    let start_x = area.x + 1 + available.saturating_sub(total_w);
+    let mut xs = start_x;
+    let mut rects: Vec<Rect> = Vec::with_capacity(labels.len());
+    for (i, s) in labels.iter().enumerate() {
+        let w = UnicodeWidthStr::width(s.as_str()) as u16;
+        rects.push(Rect { x: xs, y: area.y, width: w.max(1), height: 1 });
+        xs = xs.saturating_add(w);
+        if i + 1 != labels.len() {
+            xs = xs.saturating_add(1); // gap space
+        }
+    }
+    rects
+}
+
+/// Labels (with keyboard shortcut hints) used for header buttons in both render and hitboxes.
+pub fn header_action_button_labels() -> Vec<String> {
+    // Keep labels short to avoid overlapping the left stats header on narrow terminals.
+    // Keyboard shortcuts remain documented in the help line.
+    vec!["New".to_string(), "Start".to_string(), "Stop".to_string(), "Finish".to_string(), "Delete".to_string()]
+}
+
+/// Enabled state for each header button (New, Start, Stop, Finish, Delete).
+pub fn header_action_button_enabled(app: &App) -> [bool; 5] {
+    use crate::app::View;
+    let on_today = matches!(app.view(), View::Today);
+    let has_today = !app.day.tasks.is_empty();
+    let selected_eligible = on_today
+        && app
+            .day
+            .tasks
+            .get(app.selected_index())
+            .map(|t| matches!(t.state, crate::task::TaskState::Paused | crate::task::TaskState::Planned))
+            .unwrap_or(false);
+    let has_active = on_today && app.day.active_index().is_some();
+    let can_finish = on_today && has_today;
+    let can_delete = on_today && has_today;
+    [true, selected_eligible, has_active, can_finish, can_delete]
 }
 
 pub fn format_header_line(now_min: u16, app: &App) -> String {

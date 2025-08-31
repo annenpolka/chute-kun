@@ -53,6 +53,8 @@ pub struct App {
     pulse: bool,
     // Two-step task creation: after title input, prompt for estimate
     new_task: Option<NewTaskDraft>,
+    // Header (title-bar) UI hover state
+    hovered_header_btn: Option<HeaderButton>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +65,15 @@ enum InputKind {
     EstimateEdit,
     NewTaskEstimate,
     ConfirmDelete,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderButton {
+    New,
+    Start,
+    Stop,
+    Finish,
+    Delete,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -256,6 +267,7 @@ impl App {
             drag_from: None,
             pulse: false,
             new_task: None,
+            hovered_header_btn: None,
         }
     }
 
@@ -529,6 +541,27 @@ impl App {
         let (tabs, _banner, list, _help) = crate::ui::compute_layout(self, area);
         match ev.kind {
             MouseEventKind::Moved => {
+                // Title-bar buttons hover
+                if ev.row == area.y {
+                    let boxes = crate::ui::header_action_buttons_hitboxes(area);
+                    let mut hit: Option<HeaderButton> = None;
+                    for (i, r) in boxes.iter().enumerate() {
+                        if point_in_rect(ev.column, ev.row, *r) {
+                            hit = Some(match i {
+                                0 => HeaderButton::New,
+                                1 => HeaderButton::Start,
+                                2 => HeaderButton::Stop,
+                                3 => HeaderButton::Finish,
+                                4 => HeaderButton::Delete,
+                                _ => unreachable!(),
+                            });
+                            break;
+                        }
+                    }
+                    self.hovered_header_btn = hit;
+                } else {
+                    self.hovered_header_btn = None;
+                }
                 self.update_hover_from_coords(ev.column, ev.row, list);
                 // Tab hover
                 if ev.row == tabs.y {
@@ -546,6 +579,56 @@ impl App {
                 }
             }
             MouseEventKind::Down(MouseButton::Left) => {
+                // Title-bar buttons click
+                if ev.row == area.y {
+                    let boxes = crate::ui::header_action_buttons_hitboxes(area);
+                    let mut clicked: Option<usize> = None;
+                    for (i, r) in boxes.iter().enumerate() {
+                        if point_in_rect(ev.column, ev.row, *r) {
+                            clicked = Some(i);
+                            break;
+                        }
+                    }
+                    if let Some(i) = clicked {
+                        match i {
+                            0 => {
+                                // New task
+                                self.input =
+                                    Some(Input { kind: InputKind::Normal, buffer: String::new() });
+                            }
+                            1 => {
+                                // Start/resume selected (pause other active if needed)
+                                self.start_selected();
+                            }
+                            2 => {
+                                // Stop (pause active)
+                                if let Some(idx) = self.day.active_index() {
+                                    let now = crate::clock::system_now_minutes();
+                                    if let Some(t) = self.day.tasks.get_mut(idx) {
+                                        t.end_session(now);
+                                    }
+                                }
+                                self.day.pause_active();
+                            }
+                            3 => {
+                                // Finish selected
+                                self.finish_selected();
+                            }
+                            4 => {
+                                // Delete (confirm)
+                                if self.view == View::Today && !self.day.tasks.is_empty() {
+                                    self.input = Some(Input {
+                                        kind: InputKind::ConfirmDelete,
+                                        buffer: String::new(),
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    // After handling title click, stop so it doesn't fall through
+                    return;
+                }
                 // Tabs click
                 if ev.row == tabs.y {
                     let boxes = crate::ui::tab_hitboxes(self, tabs);
@@ -951,6 +1034,9 @@ impl App {
     pub fn popup_hover_button(&self) -> Option<PopupButton> {
         self.popup_hover
     }
+    pub fn hovered_header_button(&self) -> Option<HeaderButton> {
+        self.hovered_header_btn
+    }
 
     fn set_view(&mut self, v: View) {
         self.view = v;
@@ -1000,6 +1086,38 @@ impl App {
 }
 
 impl App {
+    /// Start or resume the selected task. If another task is active, pause it first.
+    fn start_selected(&mut self) {
+        // Only meaningful on Today view
+        if self.view != View::Today { return; }
+        let s = self.selected;
+        if let Some(active_idx) = self.day.active_index() {
+            if active_idx != s {
+                let now = crate::clock::system_now_minutes();
+                if let Some(t) = self.day.tasks.get_mut(active_idx) {
+                    t.end_session(now);
+                }
+                self.day.pause_active();
+            } else {
+                // Already active; nothing to do
+                return;
+            }
+        }
+        let eligible = matches!(
+            self.day.tasks.get(s).map(|t| t.state),
+            Some(crate::task::TaskState::Paused | crate::task::TaskState::Planned)
+        );
+        if eligible {
+            self.day.start(s);
+            if let Some(t) = self.day.tasks.get_mut(s) {
+                let now = crate::clock::system_now_minutes();
+                if t.started_at_min.is_none() {
+                    t.started_at_min = Some(now);
+                }
+                t.start_session(now);
+            }
+        }
+    }
     fn delete_selected(&mut self) {
         if self.view != View::Today || self.day.tasks.is_empty() {
             return;
