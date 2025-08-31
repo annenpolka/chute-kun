@@ -13,6 +13,13 @@ pub enum View {
     Future,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DisplayMode {
+    #[default]
+    List,
+    Calendar,
+}
+
 impl View {
     fn next(self) -> Self {
         match self {
@@ -39,6 +46,8 @@ pub struct App {
     tomorrow: Vec<Task>,
     history: Vec<Task>,
     view: View,
+    // Current content rendering mode (table vs. time blocks)
+    display: DisplayMode,
     input: Option<Input>,
     pub config: Config,
     last_seen_ymd: u32,
@@ -290,6 +299,7 @@ impl App {
             tomorrow: vec![],
             history: vec![],
             view: View::default(),
+            display: DisplayMode::List,
             input: None,
             config,
             last_seen_ymd: ymd,
@@ -486,7 +496,15 @@ impl App {
         }
         match code {
             KeyCode::Char('q') => {
-                self.should_quit = true;
+                // In Calendar view, 'q' returns to main (List) instead of quitting
+                if matches!(self.display_mode(), DisplayMode::Calendar) {
+                    self.display = DisplayMode::List;
+                } else {
+                    self.should_quit = true;
+                }
+            }
+            KeyCode::Char('t') => {
+                self.toggle_display_mode();
             }
             KeyCode::Char(':') => {
                 // Open command palette
@@ -915,7 +933,12 @@ impl App {
         use crate::config::Action as A;
         match action {
             A::Quit => {
-                self.should_quit = true;
+                // In Calendar view, treat Quit as 'back to List' to avoid accidental exit
+                if matches!(self.display_mode(), DisplayMode::Calendar) {
+                    self.display = DisplayMode::List;
+                } else {
+                    self.should_quit = true;
+                }
             }
             A::AddTask => {
                 self.input = Some(Input { kind: InputKind::Normal, buffer: String::new() });
@@ -1020,6 +1043,9 @@ impl App {
             }
             A::SelectUp => self.select_up(),
             A::SelectDown => self.select_down(),
+            A::ToggleBlocks => {
+                self.toggle_display_mode();
+            }
         }
     }
 
@@ -1099,6 +1125,9 @@ impl App {
     pub fn view(&self) -> View {
         self.view
     }
+    pub fn display_mode(&self) -> DisplayMode {
+        self.display
+    }
 
     // Input mode helpers for UI/tests
     pub fn in_input_mode(&self) -> bool {
@@ -1174,6 +1203,13 @@ impl App {
             self.selected = self.selected.min(len - 1);
         }
         self.hovered = None;
+    }
+
+    pub fn toggle_display_mode(&mut self) {
+        self.display = match self.display {
+            DisplayMode::List => DisplayMode::Calendar,
+            DisplayMode::Calendar => DisplayMode::List,
+        };
     }
 
     fn current_len(&self) -> usize {
@@ -1304,6 +1340,7 @@ impl App {
         // Supported:
         // - "est +15m" / "est -5" / "est 90m" (estimate edit)
         // - "base HH:MM" (予定の基準時刻 = day_start を変更)
+        // - "mode blocks|list" (表示モードを切替)
         let mut it = cmd.split_whitespace();
         let Some(head) = it.next() else {
             return;
@@ -1339,6 +1376,16 @@ impl App {
                         self.config.day_start_minutes = h * 60 + m;
                         // Persist by default
                         let _ = crate::config::write_day_start(h, m);
+                    }
+                }
+            }
+            "mode" => {
+                if let Some(arg) = it.next() {
+                    match arg {
+                        // Backward-compatible aliases now map to Calendar
+                        "blocks" | "timeline" | "calendar" => self.display = DisplayMode::Calendar,
+                        "list" | "table" => self.display = DisplayMode::List,
+                        _ => {}
                     }
                 }
             }
