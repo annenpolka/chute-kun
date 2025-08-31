@@ -106,30 +106,50 @@ pub fn draw(f: &mut Frame, app: &App) {
     let help_idx = chunks.len().saturating_sub(1);
     if chunks[help_idx].height > 0 {
         let help_area = chunks[help_idx];
-        // Gauge on the first line of help
-        let gauge_area = Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
-        render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
-        // Labels on the line below gauge when space allows
-        let mut next_y = help_area.y + 1;
-        if help_area.height >= 2 {
-            let label_rect = Rect { x: help_area.x, y: next_y, width: help_area.width, height: 1 };
-            render_gauge_labels(f, label_rect);
-            next_y += 1;
-        }
-        // Help text fills the remaining lines below
-        if next_y < help_area.y + help_area.height {
-            let help_text_area = Rect {
-                x: help_area.x,
-                y: next_y,
-                width: help_area.width,
-                height: (help_area.y + help_area.height).saturating_sub(next_y),
-            };
-            if help_text_area.height > 0 {
+        match help_area.height {
+            0 => {}
+            1 => {
+                // Not enough space: show help text, skip gauge/labels
+                let help_text = help_lines.join("\n");
+                let help = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: true });
+                f.render_widget(help, help_area);
+            }
+            2 => {
+                // Show gauge on first line, help text on second; skip labels to keep help visible
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
+                let help_text_area =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
                 let help_text = help_lines.join("\n");
                 let help = Paragraph::new(help_text)
                     .style(Style::default().fg(Color::DarkGray))
                     .wrap(Wrap { trim: true });
                 f.render_widget(help, help_text_area);
+            }
+            _ => {
+                // ≥3 lines: gauge, labels, then help text
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
+                let label_rect =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
+                render_gauge_labels(f, label_rect);
+                let help_text_area = Rect {
+                    x: help_area.x,
+                    y: help_area.y + 2,
+                    width: help_area.width,
+                    height: help_area.height.saturating_sub(2),
+                };
+                if help_text_area.height > 0 {
+                    let help_text = help_lines.join("\n");
+                    let help = Paragraph::new(help_text)
+                        .style(Style::default().fg(Color::DarkGray))
+                        .wrap(Wrap { trim: true });
+                    f.render_widget(help, help_text_area);
+                }
             }
         }
     }
@@ -536,27 +556,47 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
     let help_idx = chunks.len().saturating_sub(1);
     if chunks[help_idx].height > 0 {
         let help_area = chunks[help_idx];
-        let gauge_area = Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
-        render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
-        let mut next_y = help_area.y + 1;
-        if help_area.height >= 2 {
-            let label_rect = Rect { x: help_area.x, y: next_y, width: help_area.width, height: 1 };
-            render_gauge_labels(f, label_rect);
-            next_y += 1;
-        }
-        if next_y < help_area.y + help_area.height {
-            let help_text_area = Rect {
-                x: help_area.x,
-                y: next_y,
-                width: help_area.width,
-                height: (help_area.y + help_area.height).saturating_sub(next_y),
-            };
-            if help_text_area.height > 0 {
+        match help_area.height {
+            0 => {}
+            1 => {
+                let help_text = help_lines.join("\n");
+                let help = Paragraph::new(help_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: true });
+                f.render_widget(help, help_area);
+            }
+            2 => {
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
+                let help_text_area =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
                 let help_text = help_lines.join("\n");
                 let help = Paragraph::new(help_text)
                     .style(Style::default().fg(Color::DarkGray))
                     .wrap(Wrap { trim: true });
                 f.render_widget(help, help_text_area);
+            }
+            _ => {
+                let gauge_area =
+                    Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: 1 };
+                render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
+                let label_rect =
+                    Rect { x: help_area.x, y: help_area.y + 1, width: help_area.width, height: 1 };
+                render_gauge_labels(f, label_rect);
+                let help_text_area = Rect {
+                    x: help_area.x,
+                    y: help_area.y + 2,
+                    width: help_area.width,
+                    height: help_area.height.saturating_sub(2),
+                };
+                if help_text_area.height > 0 {
+                    let help_text = help_lines.join("\n");
+                    let help = Paragraph::new(help_text)
+                        .style(Style::default().fg(Color::DarkGray))
+                        .wrap(Wrap { trim: true });
+                    f.render_widget(help, help_text_area);
+                }
             }
         }
     }
