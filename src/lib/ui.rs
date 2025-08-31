@@ -1359,9 +1359,9 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
         while j < w && glyphs[j] == g && cells[j] == c {
             j += 1;
         }
-        let text: String = std::iter::repeat(g).take(j - i).collect();
+        let text: String = std::iter::repeat_n(g, j - i).collect();
         let style = match c {
-            Some(color) if g == '|' => Style::default().fg(Color::DarkGray),
+            Some(_) if g == '|' => Style::default().fg(Color::DarkGray),
             Some(color) => Style::default().fg(color).add_modifier(Modifier::BOLD),
             None => Style::default().fg(Color::DarkGray),
         };
