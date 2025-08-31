@@ -590,6 +590,11 @@ impl App {
                         }
                     }
                     if let Some(i) = clicked {
+                        // Suppress clicks on disabled buttons
+                        let enabled = crate::ui::header_action_button_enabled(self);
+                        if !enabled[i] {
+                            return;
+                        }
                         match i {
                             0 => {
                                 // New task
