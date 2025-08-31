@@ -51,5 +51,5 @@ tempfile = "3"
 unicode-width = "0.2"
 
 [[bin]]
-name = "chute-kun"
+name = "chute"
 path = "src/cli/main.rs"
