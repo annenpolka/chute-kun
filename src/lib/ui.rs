@@ -111,38 +111,8 @@ pub fn draw(f: &mut Frame, app: &App) {
             Paragraph::new(Span::styled(msg, Style::default().fg(Color::Yellow))),
             msg_rect,
         );
-        // Date line under the message with clickable < and >
         if let Some(t) = app.day.tasks.get(app.selected_index()) {
-            let ymd = t.planned_ymd;
-            let (prev, _label_rect, _next) = date_picker_hitboxes(app, popup);
-            let date_label = date_label_for(ymd);
-            let mut spans: Vec<Span> = Vec::new();
-            let pad = (prev.x.saturating_sub(inner.x)) as usize;
-            if pad > 0 {
-                spans.push(Span::raw(" ".repeat(pad)));
-            }
-            let prev_style =
-                if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DatePrev)) {
-                    Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-                };
-            spans.push(Span::styled("<".to_string(), prev_style));
-            spans.push(Span::raw(" "));
-            spans.push(Span::styled(
-                format!("Date: {}", date_label),
-                Style::default().fg(Color::Yellow),
-            ));
-            spans.push(Span::raw(" "));
-            let next_style =
-                if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DateNext)) {
-                    Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-                };
-            spans.push(Span::styled(">".to_string(), next_style));
-            let date_rect = Rect { x: inner.x, y: inner.y + 1, width: inner.width, height: 1 };
-            f.render_widget(Paragraph::new(Line::from(spans)), date_rect);
+            render_date_line(f, app, popup, inner, Color::Yellow, t.planned_ymd);
         }
         let (track, ok, cancel) = estimate_slider_hitboxes(app, popup);
         render_slider_line(f, track, app.selected_estimate().unwrap_or(0));
@@ -286,38 +256,8 @@ pub fn draw(f: &mut Frame, app: &App) {
             Paragraph::new(Span::styled(msg, Style::default().fg(Color::Green))),
             msg_rect,
         );
-        // Date line under the message with clickable < and >
         if let Some(ymd) = app.new_task_planned_ymd() {
-            let (prev, _label_rect, _next) = date_picker_hitboxes(app, popup);
-            let date_label = date_label_for(ymd);
-            let mut spans: Vec<Span> = Vec::new();
-            // pad until prev.x relative to inner.x
-            let pad = (prev.x.saturating_sub(inner.x)) as usize;
-            if pad > 0 {
-                spans.push(Span::raw(" ".repeat(pad)));
-            }
-            let prev_style =
-                if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DatePrev)) {
-                    Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-                };
-            spans.push(Span::styled("<".to_string(), prev_style));
-            spans.push(Span::raw(" "));
-            spans.push(Span::styled(
-                format!("Date: {}", date_label),
-                Style::default().fg(Color::Green),
-            ));
-            spans.push(Span::raw(" "));
-            let next_style =
-                if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DateNext)) {
-                    Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-                };
-            spans.push(Span::styled(">".to_string(), next_style));
-            let date_rect = Rect { x: inner.x, y: inner.y + 1, width: inner.width, height: 1 };
-            f.render_widget(Paragraph::new(Line::from(spans)), date_rect);
+            render_date_line(f, app, popup, inner, Color::Green, ymd);
         }
         // Slider track
         let (track, _ok, _cancel) = estimate_slider_hitboxes(app, popup);
@@ -1164,7 +1104,7 @@ fn date_line_min_width() -> u16 {
 
 /// Return hitboxes for the date picker line: (prev_btn, label, next_btn).
 /// The line lives at `inner.y + 1` in both estimate popups.
-pub fn date_picker_hitboxes(app: &App, popup: Rect) -> (Rect, Rect, Rect) {
+pub fn date_picker_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
     let inner = Rect {
         x: popup.x + 1,
         y: popup.y + 1,
@@ -1172,25 +1112,70 @@ pub fn date_picker_hitboxes(app: &App, popup: Rect) -> (Rect, Rect, Rect) {
         height: popup.height.saturating_sub(2),
     };
     let y = inner.y + 1; // date line
-                         // Determine current date label width
-    let ymd = if app.is_new_task_estimate() {
-        app.new_task_planned_ymd().unwrap_or(crate::date::today_ymd())
-    } else {
-        app.day
-            .tasks
-            .get(app.selected_index())
-            .map(|t| t.planned_ymd)
-            .unwrap_or(crate::date::today_ymd())
-    };
-    let label = format!("Date: {}", date_label_for(ymd));
-    let label_w = UnicodeWidthStr::width(label.as_str()) as u16;
-    // Layout: center [<] [space] [label] [space] [>]
-    let total = 1u16 + 1 + label_w + 1 + 1; // 1-char buttons with single spaces
-    let start_x = inner.x + (inner.width.saturating_sub(total)) / 2;
-    let prev = Rect { x: start_x, y, width: 1, height: 1 };
-    let label_rect = Rect { x: start_x + 2, y, width: label_w, height: 1 }; // skip "< "
-    let next = Rect { x: label_rect.x + label_rect.width + 1, y, width: 1, height: 1 };
+                         // Stable anchors: fixed buttons so mouse targets do not move with label width
+    let prev = Rect { x: inner.x + 2, y, width: 1, height: 1 };
+    let next = Rect { x: inner.x + inner.width.saturating_sub(3), y, width: 1, height: 1 };
+    // Label fills the space between prev and next minus single spaces around it
+    let label_x = prev.x + 2; // "< " then label
+    let label_w = next.x.saturating_sub(label_x).saturating_sub(1);
+    let label_rect = Rect { x: label_x, y, width: label_w, height: 1 };
     (prev, label_rect, next)
+}
+
+fn render_date_line(f: &mut Frame, app: &App, popup: Rect, inner: Rect, color: Color, ymd: u32) {
+    let (prev, label_rect, next) = date_picker_hitboxes(app, popup);
+    let date_label = date_label_for(ymd);
+    let text = format!("Date: {}", date_label);
+    let mut spans: Vec<Span> = Vec::new();
+    // pad until prev
+    let left_pad = prev.x.saturating_sub(inner.x) as usize;
+    if left_pad > 0 {
+        spans.push(Span::raw(" ".repeat(left_pad)));
+    }
+    let prev_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DatePrev))
+    {
+        Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(color).add_modifier(Modifier::BOLD)
+    };
+    spans.push(Span::styled("<".to_string(), prev_style));
+    spans.push(Span::raw(" "));
+    // Fit label to available width
+    let fitted = fit_to_width(&text, label_rect.width as usize);
+    spans.push(Span::styled(fitted, Style::default().fg(color)));
+    // Compute spaces so that '>' appears at next.x
+    let printed_w = (UnicodeWidthStr::width(text.as_str()) as u16).min(label_rect.width);
+    let gap = next.x.saturating_sub(prev.x + 2 + printed_w) as usize;
+    if gap > 0 {
+        spans.push(Span::raw(" ".repeat(gap)));
+    }
+    let next_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::DateNext))
+    {
+        Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(color).add_modifier(Modifier::BOLD)
+    };
+    spans.push(Span::styled(">".to_string(), next_style));
+    let date_rect = Rect { x: inner.x, y: label_rect.y, width: inner.width, height: 1 };
+    f.render_widget(Paragraph::new(Line::from(spans)), date_rect);
+}
+
+fn fit_to_width(s: &str, width: usize) -> String {
+    use unicode_width::UnicodeWidthChar;
+    if UnicodeWidthStr::width(s) <= width {
+        return s.to_string();
+    }
+    let mut out = String::new();
+    let mut used = 0usize;
+    for ch in s.chars() {
+        let w = ch.width().unwrap_or(1);
+        if used + w > width {
+            break;
+        }
+        out.push(ch);
+        used += w;
+    }
+    out
 }
 
 fn render_slider_line(f: &mut Frame, track: Rect, minutes: u16) {
