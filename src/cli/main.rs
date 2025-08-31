@@ -104,8 +104,7 @@ fn main() -> Result<()> {
 
     // Load config and state snapshot (if found) from XDG data path or override.
     let cfg = Config::load();
-    let chosen_path = state_path_override
-        .or_else(storage::default_state_path)
+    let chosen_path = storage::resolve_state_path(&cfg, state_path_override)
         .expect("could not resolve default state path");
 
     let mut app = match storage::load_from_path(&chosen_path, cfg.clone())? {

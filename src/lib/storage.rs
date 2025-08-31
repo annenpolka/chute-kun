@@ -93,3 +93,17 @@ pub fn default_state_path() -> Option<PathBuf> {
     }
     dirs::data_dir().map(|b| b.join("chute_kun").join("snapshot.toml"))
 }
+
+/// Resolve the snapshot path with precedence:
+/// 1) Config `state_path` (if set)
+/// 2) CLI `--state` override
+/// 3) Env/OS defaults via `default_state_path()`
+pub fn resolve_state_path(cfg: &Config, cli_override: Option<PathBuf>) -> Option<PathBuf> {
+    if let Some(p) = cfg.state_path.clone() {
+        return Some(p);
+    }
+    if let Some(p) = cli_override {
+        return Some(p);
+    }
+    default_state_path()
+}
