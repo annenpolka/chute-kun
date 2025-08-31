@@ -12,8 +12,8 @@ fn partial_seconds_persist_on_resume() {
     app.tick(59);
     assert_eq!(app.day.tasks[0].actual_min, 0);
 
-    // 一時停止→再開
-    app.handle_key(KeyCode::Char(' '));
+    // 一時停止→再開（Enter のトグル）
+    app.handle_key(KeyCode::Enter);
     assert_eq!(app.day.active_index(), None);
     app.handle_key(KeyCode::Enter);
 

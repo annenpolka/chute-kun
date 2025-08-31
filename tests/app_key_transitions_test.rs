@@ -13,8 +13,8 @@ fn enter_space_shiftenter_transitions() {
     assert_eq!(app.day.tasks[0].state, TaskState::Active);
     assert_eq!(app.day.active_index(), Some(0));
 
-    // Space: Pause
-    app.handle_key(KeyCode::Char(' '));
+    // Enter again: Pause (Space no longer pauses)
+    app.handle_key(KeyCode::Enter);
     assert_eq!(app.day.tasks[0].state, TaskState::Paused);
     assert_eq!(app.day.active_index(), None);
 

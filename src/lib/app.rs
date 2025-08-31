@@ -77,6 +77,7 @@ enum InputKind {
     NewTaskEstimate,
     ConfirmDelete,
     CategoryPicker,
+    StartTimeEdit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -277,6 +278,47 @@ impl App {
                                 self.input = None;
                                 break;
                             }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else if self.is_start_time_edit() {
+            if let Some(popup) = crate::ui::compute_start_time_popup_rect(self, area) {
+                let (track, ok, cancel) = crate::ui::estimate_slider_hitboxes(self, popup);
+                match ev.kind {
+                    MouseEventKind::Moved => {
+                        let pos = (ev.column, ev.row);
+                        self.popup_hover = if crate::app::point_in_rect(pos.0, pos.1, ok) {
+                            Some(PopupButton::EstOk)
+                        } else if crate::app::point_in_rect(pos.0, pos.1, cancel) {
+                            Some(PopupButton::EstCancel)
+                        } else {
+                            None
+                        };
+                    }
+                    MouseEventKind::Down(MouseButton::Left)
+                    | MouseEventKind::Drag(MouseButton::Left) => {
+                        let pos = (ev.column, ev.row);
+                        if crate::app::point_in_rect(pos.0, pos.1, track) {
+                            let m =
+                                crate::ui::minutes_from_slider_x(track, 0, 23 * 60 + 59, 5, pos.0);
+                            if let Some(inp) = self.input.as_mut() {
+                                inp.buffer = m.to_string();
+                            }
+                        } else if crate::app::point_in_rect(pos.0, pos.1, ok) {
+                            // Apply and close
+                            let m = self
+                                .input
+                                .as_ref()
+                                .and_then(|i| i.buffer.parse::<u16>().ok())
+                                .unwrap_or(self.config.day_start_minutes);
+                            if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                                t.fixed_start_min = Some(m.min(23 * 60 + 59));
+                            }
+                            self.input = None;
+                        } else if crate::app::point_in_rect(pos.0, pos.1, cancel) {
+                            self.input = None;
                         }
                     }
                     _ => {}
@@ -542,6 +584,37 @@ impl App {
                     }
                     _ => {}
                 },
+                InputKind::StartTimeEdit => match code {
+                    KeyCode::Enter | KeyCode::Esc => {
+                        // Apply on Enter, discard on Esc
+                        if matches!(code, KeyCode::Enter) {
+                            if let Some(buf) = self.input.as_ref().map(|i| i.buffer.clone()) {
+                                if let Ok(mins) = buf.trim().parse::<u16>() {
+                                    if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                                        let clamped = mins.min(23 * 60 + 59);
+                                        t.fixed_start_min = Some(clamped);
+                                    }
+                                }
+                            }
+                        }
+                        self.input = None;
+                    }
+                    KeyCode::Up | KeyCode::Right | KeyCode::Char('k') => {
+                        if let Some(input) = self.input.as_mut() {
+                            let base = input.buffer.trim().parse::<u16>().ok().unwrap_or(0);
+                            let next = (base + 5).min(23 * 60 + 59);
+                            input.buffer = next.to_string();
+                        }
+                    }
+                    KeyCode::Down | KeyCode::Left | KeyCode::Char('j') => {
+                        if let Some(input) = self.input.as_mut() {
+                            let base = input.buffer.trim().parse::<u16>().ok().unwrap_or(0);
+                            let next = base.saturating_sub(5);
+                            input.buffer = next.to_string();
+                        }
+                    }
+                    _ => {}
+                },
             }
             return;
         }
@@ -556,6 +629,17 @@ impl App {
             }
             KeyCode::Char('t') => {
                 self.toggle_display_mode();
+            }
+            KeyCode::Char(' ') => {
+                // Open Start Time slider via legacy direct key handling
+                let initial = self
+                    .day
+                    .tasks
+                    .get(self.selected)
+                    .and_then(|t| t.fixed_start_min)
+                    .unwrap_or(self.config.day_start_minutes);
+                self.input =
+                    Some(Input { kind: InputKind::StartTimeEdit, buffer: initial.to_string() });
             }
             KeyCode::Char('c') => {
                 // Cycle category of the selected task (Today view only for now)
@@ -630,9 +714,6 @@ impl App {
                         }
                     }
                 }
-            }
-            KeyCode::Char(' ') => {
-                self.day.pause_active();
             }
             KeyCode::Char(']') => {
                 let new = self.day.reorder_down(self.selected);
@@ -1113,14 +1194,16 @@ impl App {
                 // Now defined as "finish selected"
                 self.finish_selected();
             }
-            A::Pause => {
-                if let Some(idx) = self.day.active_index() {
-                    let now = crate::clock::system_now_minutes();
-                    if let Some(t) = self.day.tasks.get_mut(idx) {
-                        t.end_session(now);
-                    }
-                }
-                self.day.pause_active();
+            A::OpenPopup => {
+                // Open Start Time slider for selected task
+                let initial = self
+                    .day
+                    .tasks
+                    .get(self.selected)
+                    .and_then(|t| t.fixed_start_min)
+                    .unwrap_or(self.config.day_start_minutes);
+                self.input =
+                    Some(Input { kind: InputKind::StartTimeEdit, buffer: initial.to_string() });
             }
             A::Delete => {
                 if self.view == View::Today && !self.day.tasks.is_empty() {
@@ -1270,6 +1353,9 @@ impl App {
     }
     pub fn is_category_picker(&self) -> bool {
         matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::CategoryPicker))
+    }
+    pub fn is_start_time_edit(&self) -> bool {
+        matches!(self.input.as_ref().map(|i| i.kind), Some(InputKind::StartTimeEdit))
     }
     /// True only when typing a task title (Normal/Interrupt), not for estimate/confirm popups.
     pub fn is_text_input_mode(&self) -> bool {
@@ -1491,6 +1577,23 @@ impl App {
                     if let Ok(v) = num_part.parse::<u16>() {
                         if let Some(t) = self.day.tasks.get_mut(self.selected) {
                             t.estimate_min = v;
+                        }
+                    }
+                }
+            }
+            "at" => {
+                if let Some(arg) = it.next() {
+                    if arg == "-"
+                        || arg.eq_ignore_ascii_case("none")
+                        || arg.eq_ignore_ascii_case("clear")
+                    {
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            t.fixed_start_min = None;
+                        }
+                    } else if let Ok((h, m)) = crate::config::parse_hhmm_or_compact(arg) {
+                        let minutes = h * 60 + m;
+                        if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                            t.fixed_start_min = Some(minutes);
                         }
                     }
                 }

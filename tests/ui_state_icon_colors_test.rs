@@ -23,7 +23,7 @@ fn table_status_icons_are_colored() {
 
     // A: start then pause -> '='
     app.handle_key(KeyCode::Enter);
-    app.handle_key(KeyCode::Char(' '));
+    app.handle_key(KeyCode::Enter);
     // B: select and start -> '>'
     app.handle_key(KeyCode::Char('j')); // move selection to B
     app.handle_key(KeyCode::Enter);

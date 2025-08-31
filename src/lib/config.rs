@@ -27,7 +27,7 @@ pub struct KeyMap {
     pub add_interrupt: Vec<KeySpec>,
     pub start_or_resume: Vec<KeySpec>,
     pub finish_active: Vec<KeySpec>,
-    pub pause: Vec<KeySpec>,
+    pub popup: Vec<KeySpec>,
     pub delete: Vec<KeySpec>,
     pub reorder_up: Vec<KeySpec>,
     pub reorder_down: Vec<KeySpec>,
@@ -53,7 +53,7 @@ impl Default for KeyMap {
             add_interrupt: vec![k("I")],
             start_or_resume: vec![k("Enter")],
             finish_active: vec![k("Shift+Enter"), k("f")],
-            pause: vec![k("Space")],
+            popup: vec![k("Space")],
             delete: vec![k("x")],
             reorder_up: vec![k("[")],
             reorder_down: vec![k("]")],
@@ -78,7 +78,7 @@ pub enum Action {
     AddInterrupt,
     StartOrResume,
     FinishActive,
-    Pause,
+    OpenPopup,
     Delete,
     ReorderUp,
     ReorderDown,
@@ -107,8 +107,8 @@ impl KeyMap {
             Some(Action::StartOrResume)
         } else if matches(&self.finish_active) {
             Some(Action::FinishActive)
-        } else if matches(&self.pause) {
-            Some(Action::Pause)
+        } else if matches(&self.popup) {
+            Some(Action::OpenPopup)
         } else if matches(&self.delete) {
             Some(Action::Delete)
         } else if matches(&self.reorder_up) {
@@ -290,7 +290,7 @@ struct RawKeys {
     add_interrupt: Option<OneOrMany>,
     start_or_resume: Option<OneOrMany>,
     finish_active: Option<OneOrMany>,
-    pause: Option<OneOrMany>,
+    popup: Option<OneOrMany>,
     delete: Option<OneOrMany>,
     reorder_up: Option<OneOrMany>,
     reorder_down: Option<OneOrMany>,
@@ -364,8 +364,8 @@ impl Config {
             if let Some(v) = keys.finish_active {
                 apply(&mut km.finish_active, v)?;
             }
-            if let Some(v) = keys.pause {
-                apply(&mut km.pause, v)?;
+            if let Some(v) = keys.popup {
+                apply(&mut km.popup, v)?;
             }
             if let Some(v) = keys.delete {
                 apply(&mut km.delete, v)?;
@@ -455,7 +455,7 @@ add_task = "i"
 add_interrupt = "Shift+i"
 start_or_resume = "Enter"
 finish_active = ["Shift+Enter", "f"]
-pause = "Space"
+popup = "Space"
 delete = "x"
 reorder_up = "["
 reorder_down = "]"
