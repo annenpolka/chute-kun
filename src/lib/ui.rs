@@ -161,19 +161,54 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
     }
 
-    // Overlay: simple quick popup bound to Space
-    if let Some(popup) = compute_quick_popup_rect(app, area) {
+    // Overlay: Start Time slider popup (Space)
+    if let Some(popup) = compute_start_time_popup_rect(app, area) {
         let border = Style::default().fg(Color::Cyan);
         let title_line =
-            Line::from(Span::styled(" Quick Menu ", border.add_modifier(Modifier::BOLD)));
+            Line::from(Span::styled(" Start Time ", border.add_modifier(Modifier::BOLD)));
         let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
         f.render_widget(Clear, popup);
         f.render_widget(block.clone(), popup);
         let inner = block.inner(popup);
-        let text = "Press Enter/Esc to close";
-        let para = Paragraph::new(Span::styled(text, border));
+        let mins =
+            app.input_buffer().and_then(|s| s.parse::<u16>().ok()).unwrap_or(app_display_base(app));
+        let hh = (mins / 60) % 24;
+        let mm = mins % 60;
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+        let msg = if title.is_empty() {
+            format!("Start: {:02}:{:02}", hh, mm)
+        } else {
+            format!("Start: {:02}:{:02} — {}", hh, mm, title)
+        };
         let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
-        f.render_widget(para, msg_rect);
+        f.render_widget(Paragraph::new(Span::styled(msg, border)), msg_rect);
+        let (track, ok, cancel) = estimate_slider_hitboxes(app, popup);
+        render_time_slider_line(f, track, mins);
+        let btn_y = ok.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad = (ok.x.saturating_sub(inner.x)) as usize;
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        let ok_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstOk)) {
+            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Black).bg(Color::Blue).add_modifier(Modifier::BOLD)
+        };
+        spans.push(Span::styled("OK".to_string(), ok_style));
+        let gap2 = cancel.x.saturating_sub(ok.x + ok.width) as usize;
+        if gap2 > 0 {
+            spans.push(Span::raw(" ".repeat(gap2)));
+        }
+        let cancel_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstCancel)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Cancel".to_string(), cancel_style));
+        let btn_rect = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
     }
 
     // Overlay: centered input popup (styled buttons)
@@ -505,19 +540,54 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         let para = Paragraph::new(Span::styled(msg.clone(), Style::default().fg(Color::Red)));
         f.render_widget(para, inner_popup);
     }
-    // Overlay: quick popup with injected clock path as well
-    if let Some(popup) = compute_quick_popup_rect(app, area) {
+    // Overlay: Start Time popup under injected clock path as well
+    if let Some(popup) = compute_start_time_popup_rect(app, area) {
         let border = Style::default().fg(Color::Cyan);
         let title_line =
-            Line::from(Span::styled(" Quick Menu ", border.add_modifier(Modifier::BOLD)));
+            Line::from(Span::styled(" Start Time ", border.add_modifier(Modifier::BOLD)));
         let block = Block::default().borders(Borders::ALL).title(title_line).border_style(border);
         f.render_widget(Clear, popup);
         f.render_widget(block.clone(), popup);
         let inner = block.inner(popup);
-        let text = "Press Enter/Esc to close";
-        let para = Paragraph::new(Span::styled(text, border));
+        let mins =
+            app.input_buffer().and_then(|s| s.parse::<u16>().ok()).unwrap_or(app_display_base(app));
+        let hh = (mins / 60) % 24;
+        let mm = mins % 60;
+        let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+        let msg = if title.is_empty() {
+            format!("Start: {:02}:{:02}", hh, mm)
+        } else {
+            format!("Start: {:02}:{:02} — {}", hh, mm, title)
+        };
         let msg_rect = Rect { x: inner.x, y: inner.y, width: inner.width, height: 1 };
-        f.render_widget(para, msg_rect);
+        f.render_widget(Paragraph::new(Span::styled(msg, border)), msg_rect);
+        let (track, ok, cancel) = estimate_slider_hitboxes(app, popup);
+        render_time_slider_line(f, track, mins);
+        let btn_y = ok.y;
+        let mut spans: Vec<Span> = Vec::new();
+        let pad = (ok.x.saturating_sub(inner.x)) as usize;
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        let ok_style = if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstOk)) {
+            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Black).bg(Color::Blue).add_modifier(Modifier::BOLD)
+        };
+        spans.push(Span::styled("OK".to_string(), ok_style));
+        let gap2 = cancel.x.saturating_sub(ok.x + ok.width) as usize;
+        if gap2 > 0 {
+            spans.push(Span::raw(" ".repeat(gap2)));
+        }
+        let cancel_style =
+            if matches!(app.popup_hover_button(), Some(crate::app::PopupButton::EstCancel)) {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Black).bg(Color::Gray).add_modifier(Modifier::BOLD)
+            };
+        spans.push(Span::styled("Cancel".to_string(), cancel_style));
+        let btn_rect = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
+        f.render_widget(Paragraph::new(Line::from(spans)), btn_rect);
     }
 }
 
@@ -969,7 +1039,7 @@ pub fn format_help_line() -> String {
     let nav = "q: quit | Tab: switch view";
     // - task lifecycle and operations (Today view only in optimized variant)
     let task =
-        "Enter: start/pause | Shift+Enter/f: finish | Space: popup | i: interrupt | p: postpone | x: delete | b: bring | [: up | ]: down | e: edit | j/k";
+        "Enter: start/pause | Shift+Enter/f: finish | Space: time | i: interrupt | p: postpone | x: delete | b: bring | [: up | ]: down | e: edit | j/k";
     format!("{} | {}", nav, task)
 }
 
@@ -989,8 +1059,13 @@ pub fn help_items_for(app: &App) -> Vec<String> {
     if app.is_confirm_delete() {
         return vec!["Enter/y: delete".to_string(), "Esc/n: cancel".to_string()];
     }
-    if app.is_quick_popup() {
-        return vec!["Enter: close".to_string(), "Esc: close".to_string()];
+    if app.is_start_time_edit() {
+        return vec![
+            "Enter: OK".to_string(),
+            "Esc: cancel".to_string(),
+            "Left/Right/Up/Down/j/k: +/-5m".to_string(),
+            "click slider: set time".to_string(),
+        ];
     }
     if app.is_estimate_editing() {
         return vec![
@@ -1431,21 +1506,60 @@ pub fn date_picker_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect, Rect) {
 }
 
 // Simple quick popup geometry
-pub fn compute_quick_popup_rect(app: &App, area: Rect) -> Option<Rect> {
-    if !app.is_quick_popup() {
+pub fn compute_start_time_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_start_time_edit() {
         return None;
     }
     let inner = Block::default().borders(Borders::ALL).inner(area);
-    if inner.width < 20 || inner.height < 3 {
+    if inner.width < 24 || inner.height < 4 {
         return None;
     }
-    let content = "Press Enter/Esc to close";
-    let content_w = UnicodeWidthStr::width(content) as u16;
-    let popup_w = content_w.saturating_add(6).min(inner.width).max(22).min(inner.width);
-    let popup_h: u16 = 3;
+    let title = app.day.tasks.get(app.selected_index()).map(|t| t.title.as_str()).unwrap_or("");
+    let mins =
+        app.input_buffer().and_then(|s| s.parse::<u16>().ok()).unwrap_or(app_display_base(app));
+    let hh = (mins / 60) % 24;
+    let mm = mins % 60;
+    let msg = if title.is_empty() {
+        format!("Start: {:02}:{:02}", hh, mm)
+    } else {
+        format!("Start: {:02}:{:02} — {}", hh, mm, title)
+    };
+    let content_w = UnicodeWidthStr::width(msg.as_str()) as u16;
+    let popup_w = content_w.saturating_add(6).min(inner.width).max(28).min(inner.width);
+    let popup_h: u16 = 4; // message + slider + buttons
     let px = inner.x + (inner.width.saturating_sub(popup_w)) / 2;
     let py = inner.y + (inner.height.saturating_sub(popup_h)) / 2;
     Some(Rect { x: px, y: py, width: popup_w, height: popup_h })
+}
+
+fn render_time_slider_line(f: &mut Frame, track: Rect, minutes: u16) {
+    let min = 0u16;
+    let max = 23 * 60 + 59;
+    let step = 5u16;
+    let knob_x = slider_x_for_minutes(track, min, max, step, minutes);
+    let mut line = Line::default();
+    line.spans.push(Span::styled("[".to_string(), Style::default().fg(Color::DarkGray)));
+    for x in track.x..track.x + track.width {
+        if x == knob_x {
+            line.spans.push(Span::styled(
+                "●".to_string(),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            ));
+        } else if x < knob_x {
+            line.spans.push(Span::styled("=".to_string(), Style::default().fg(Color::Green)));
+        } else {
+            line.spans.push(Span::styled("·".to_string(), Style::default().fg(Color::DarkGray)));
+        }
+    }
+    line.spans.push(Span::styled("]".to_string(), Style::default().fg(Color::DarkGray)));
+    let para = Paragraph::new(line);
+    let expanded = Rect {
+        x: track.x.saturating_sub(1),
+        y: track.y,
+        width: track.width.saturating_add(2),
+        height: 1,
+    };
+    f.render_widget(para, expanded);
 }
 
 fn render_date_line(f: &mut Frame, app: &App, popup: Rect, inner: Rect, color: Color, ymd: u32) {
