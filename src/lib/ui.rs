@@ -562,7 +562,7 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         let mm = starts[i] % 60;
         let planned_cell = Cell::from(format!("{:02}:{:02}", hh, mm));
         let actual_cell = Cell::from(format_actual_last_finish_time(t));
-        // Title cell with colored state icon and plain title/estimate
+        // Title cell with colored state icon and plain title (estimate is a dedicated column)
         let mut spans: Vec<Span> = Vec::new();
         // Drag target indicator arrow before icon (only while dragging over this row)
         if dragging && hovered == Some(i) {
@@ -577,15 +577,16 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         }
         spans.push(state_icon_span(t.state));
         spans.push(Span::raw(" "));
-        // Completed tasks: render title (and estimate suffix) with strikethrough for clarity
+        // Completed tasks: render title with strikethrough for clarity
         let title_style = if matches!(t.state, TaskState::Done) {
             Style::default().add_modifier(Modifier::CROSSED_OUT)
         } else {
             Style::default()
         };
         spans.push(Span::styled(t.title.clone(), title_style));
-        spans.push(Span::styled(format!(" (est:{}m)", t.estimate_min), title_style));
         let title_cell = Cell::from(Line::from(spans));
+        // New dedicated estimate column
+        let est_cell = Cell::from(format!("{}m", t.estimate_min));
         // New dedicated accumulated time column with seconds
         let secs = if matches!(t.state, TaskState::Active | TaskState::Paused) {
             t.actual_carry_sec
@@ -610,9 +611,8 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         } else {
             None
         };
-        // Column order: Plan | Task | Actual (measured time as last-finish placeholder)
-        // Column order: Plan | Task | Act | Actual
-        let mut row = Row::new(vec![planned_cell, title_cell, act_cell, actual_cell]);
+        // Column order: Plan | Est | Task | Act | Actual
+        let mut row = Row::new(vec![planned_cell, est_cell, title_cell, act_cell, actual_cell]);
         if let Some(bg) = highlight_bg {
             let s = Style::default().bg(bg);
             row = row.style(s);
@@ -621,18 +621,24 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
     }
 
     // Header
-    // Header labels follow the same order: Plan | Task | Act | Actual
+    // Header labels follow the same order: Plan | Est | Task | Act | Actual
     let header = Row::new(vec![
         Cell::from("Plan"),
+        Cell::from("Est"),
         Cell::from("Task"),
         Cell::from("Act"),
         Cell::from("Actual"),
     ])
     .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
 
-    // Column widths: Plan fixed 5, Task grows, Act fits e.g. "120m 59s" (9), Actual label width (6)
-    let widths =
-        [Constraint::Length(5), Constraint::Min(10), Constraint::Length(9), Constraint::Length(6)];
+    // Column widths: Plan fixed 5, Est fits e.g. "120m" (4), Task grows, Act fits e.g. "120m 59s" (9), Actual label width (6)
+    let widths = [
+        Constraint::Length(5), // Plan
+        Constraint::Length(4), // Est
+        Constraint::Min(10),   // Task
+        Constraint::Length(9), // Act
+        Constraint::Length(6), // Actual
+    ];
 
     // Render table using a minimal block to avoid nested borders (outer block already drawn)
     Table::new(rows, widths).header(header).column_spacing(1).block(Block::default())
