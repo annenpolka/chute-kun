@@ -38,6 +38,7 @@ pub struct KeyMap {
     pub view_prev: Vec<KeySpec>,
     pub select_up: Vec<KeySpec>,
     pub select_down: Vec<KeySpec>,
+    pub toggle_blocks: Vec<KeySpec>,
 }
 
 impl Default for KeyMap {
@@ -61,6 +62,7 @@ impl Default for KeyMap {
             view_prev: vec![k("BackTab")],
             select_up: vec![k("Up"), k("k")],
             select_down: vec![k("Down"), k("j")],
+            toggle_blocks: vec![k("t")],
         }
     }
 }
@@ -83,6 +85,7 @@ pub enum Action {
     ViewPrev,
     SelectUp,
     SelectDown,
+    ToggleBlocks,
 }
 
 impl KeyMap {
@@ -120,6 +123,8 @@ impl KeyMap {
             Some(Action::SelectUp)
         } else if matches(&self.select_down) {
             Some(Action::SelectDown)
+        } else if matches(&self.toggle_blocks) {
+            Some(Action::ToggleBlocks)
         } else {
             None
         }
@@ -250,6 +255,7 @@ struct RawKeys {
     view_prev: Option<OneOrMany>,
     select_up: Option<OneOrMany>,
     select_down: Option<OneOrMany>,
+    toggle_blocks: Option<OneOrMany>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -343,6 +349,9 @@ impl Config {
             if let Some(v) = keys.select_down {
                 apply(&mut km.select_down, v)?;
             }
+            if let Some(v) = keys.toggle_blocks {
+                apply(&mut km.toggle_blocks, v)?;
+            }
             cfg.keys = km;
         }
         Ok(cfg)
@@ -403,6 +412,7 @@ view_next = "Tab"
 view_prev = "BackTab"
 select_up = ["Up", "k"]
 select_down = ["Down", "j"]
+toggle_blocks = "t"
 "#.to_string()
     }
 

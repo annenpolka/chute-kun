@@ -5,7 +5,7 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::{App, View};
+use crate::app::{App, DisplayMode, View};
 use crate::clock::Clock;
 use crate::task::TaskState;
 
@@ -83,8 +83,21 @@ pub fn draw(f: &mut Frame, app: &App) {
         let para = Paragraph::new("No tasks — press 'i' to add");
         f.render_widget(para, chunks[content_idx]);
     } else {
-        let table = build_task_table(now, app, &tasks_slice);
-        f.render_widget(table, chunks[content_idx]);
+        match app.display_mode() {
+            DisplayMode::List => {
+                let table = build_task_table(now, app, &tasks_slice);
+                f.render_widget(table, chunks[content_idx]);
+            }
+            DisplayMode::Calendar => {
+                render_calendar_day_at(
+                    f,
+                    chunks[content_idx],
+                    app,
+                    &tasks_slice,
+                    crate::clock::system_now_minutes(),
+                );
+            }
+        }
     }
 
     // Help block at the bottom (wrapped to fit width)
@@ -396,10 +409,21 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         if chunks.len() > content_idx && chunks[content_idx].height > 0 {
             f.render_widget(para, chunks[content_idx]);
         }
-    } else {
-        let table = build_task_table(now, app, &tasks_slice);
-        if chunks.len() > content_idx && chunks[content_idx].height > 0 {
-            f.render_widget(table, chunks[content_idx]);
+    } else if chunks.len() > content_idx && chunks[content_idx].height > 0 {
+        match app.display_mode() {
+            DisplayMode::List => {
+                let table = build_task_table(now, app, &tasks_slice);
+                f.render_widget(table, chunks[content_idx]);
+            }
+            DisplayMode::Calendar => {
+                render_calendar_day_at(
+                    f,
+                    chunks[content_idx],
+                    app,
+                    &tasks_slice,
+                    clock.now_minutes(),
+                );
+            }
         }
     }
 
@@ -908,6 +932,8 @@ pub fn help_items_for(app: &App) -> Vec<String> {
             items.push(format!("{}: up", join(&km.reorder_up)));
             items.push(format!("{}: down", join(&km.reorder_down)));
             items.push(format!("{}: edit", join(&km.estimate_plus)));
+            // Toggle display mode (List <-> Calendar)
+            items.push(format!("{}: calendar", join(&km.toggle_blocks)));
             // Compact vim-like navigation chars as trailing hint (if present)
             let up_chars: Vec<char> = km
                 .select_up
@@ -1422,4 +1448,225 @@ pub fn compute_layout(app: &App, area: Rect) -> (Rect, Option<Rect>, Rect, Rect)
         height: help_height,
     };
     (tabs, banner, list, help)
+}
+
+// ---- Time Blocks (Timeline) Mode ----
+
+// (removed horizontal time blocks view)
+
+/// Google Calendar風の縦軸タイムライン。左に時刻ラベル、右に2レーン（Plan/Actual）。
+fn render_calendar_day_at(
+    f: &mut Frame,
+    rect: Rect,
+    app: &App,
+    tasks: &[crate::task::Task],
+    now_min: u16,
+) {
+    if rect.height == 0 || rect.width < 12 {
+        return;
+    }
+    let start_min = app_display_base(app);
+    // Planned end accumulates estimates sequentially from day start
+    let mut cur = start_min;
+    let mut planned_ranges: Vec<(u16, u16, String)> = Vec::new();
+    for t in tasks.iter() {
+        let s = cur;
+        let e = cur.saturating_add(t.estimate_min);
+        planned_ranges.push((s, e, t.title.clone()));
+        cur = e;
+    }
+    let mut act_ranges: Vec<(u16, u16, String, bool)> = Vec::new();
+    for t in tasks.iter() {
+        for s in t.sessions.iter() {
+            let end = s.end_min.unwrap_or(now_min);
+            let closed = s.end_min.is_some();
+            act_ranges.push((s.start_min, end, t.title.clone(), closed));
+        }
+    }
+    let latest = planned_ranges
+        .iter()
+        .map(|&(_, e, _)| e)
+        .chain(act_ranges.iter().map(|&(_, e, _, _)| e))
+        .max()
+        .unwrap_or(start_min);
+    let end_min = latest.max(start_min + 90); // ensure some space (≥1.5h)
+    let span = end_min.saturating_sub(start_min).max(1);
+
+    // Layout: [gutter 6] [space 1] [plan lane] [gap 1] [act lane]
+    let gutter = 6u16; // e.g., "09:00"
+    let gaps = 2u16; // spaces between lanes and gutter
+    let lanes_w = rect.width.saturating_sub(gutter + gaps);
+    let lane_w = (lanes_w.saturating_sub(1)) / 2; // leave 1 col gap between lanes
+    if lane_w == 0 {
+        return;
+    }
+    // lanes start after the gutter; we render strings via Paragraph
+
+    // Map minute -> y row in [0..h-1]
+    let to_y = |m: u16, h: u16| -> u16 {
+        let rel = m.saturating_sub(start_min) as u32;
+        let y = (rel * (h.saturating_sub(1) as u32)) / (span as u32);
+        y as u16
+    };
+
+    // Prepare line-by-line strings for lanes
+    let mut lines_plan: Vec<String> = vec![" ".repeat(lane_w as usize); rect.height as usize];
+    let mut lines_act: Vec<String> = vec![" ".repeat(lane_w as usize); rect.height as usize];
+
+    for (s, e, title) in planned_ranges.into_iter() {
+        let y0 = to_y(s, rect.height);
+        let y1 = to_y(e, rect.height).max(y0);
+        for y in y0..=y1 {
+            if let Some(row) = lines_plan.get_mut(y as usize) {
+                *row = "█".repeat(lane_w as usize);
+            }
+        }
+        // Put the task title on the first row of its planned block
+        if let Some(row) = lines_plan.get_mut(y0 as usize) {
+            let fitted = fit_to_width(&title, lane_w as usize);
+            use unicode_width::UnicodeWidthStr as UW;
+            let w = UW::width(fitted.as_str()) as u16;
+            let mut s = String::new();
+            s.push_str(&fitted);
+            if w < lane_w {
+                s.push_str(&"█".repeat((lane_w - w) as usize));
+            }
+            *row = s;
+        }
+    }
+    for (s, e, _title, _closed) in act_ranges.iter().cloned() {
+        let y0 = to_y(s, rect.height);
+        let y1 = to_y(e, rect.height).max(y0);
+        for y in y0..=y1 {
+            if let Some(row) = lines_act.get_mut(y as usize) {
+                *row = "▓".repeat(lane_w as usize);
+            }
+        }
+    }
+
+    // Title overlays for closed sessions with overlap detection: prefer longer durations
+    let mut overlays: Vec<(u16 /*dur*/, u16 /*row*/, String)> = Vec::new();
+    for (s, e, title, closed) in act_ranges.into_iter() {
+        if closed && e <= now_min {
+            let y = to_y(s, rect.height);
+            let dur = e.saturating_sub(s);
+            overlays.push((dur, y, title));
+        }
+    }
+    overlays.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut used: Vec<bool> = vec![false; rect.height as usize];
+    for (_dur, y, title) in overlays.into_iter() {
+        let yi = y.min(rect.height.saturating_sub(1)) as usize;
+        if used[yi] {
+            continue;
+        }
+        if let Some(row) = lines_act.get_mut(yi) {
+            let fitted = fit_to_width(&title, lane_w as usize);
+            use unicode_width::UnicodeWidthStr as UW;
+            let w = UW::width(fitted.as_str()) as u16;
+            let mut sline = String::new();
+            sline.push_str(&fitted);
+            if w < lane_w {
+                sline.push_str(&"▓".repeat((lane_w - w) as usize));
+            }
+            *row = sline;
+            used[yi] = true;
+        }
+    }
+
+    // Precompute hour labels mapped to row positions to avoid missing due to discretization
+    let mut hour_labels: Vec<Option<String>> = vec![None; rect.height as usize];
+    let mut hmark = start_min.saturating_sub(start_min % 60); // floor to hour
+    while hmark <= end_min {
+        let y = to_y(hmark, rect.height);
+        let label = format!("{:02}:00", (hmark / 60) % 24);
+        if (y as usize) < hour_labels.len() {
+            hour_labels[y as usize] = Some(label);
+        }
+        hmark = hmark.saturating_add(60);
+    }
+
+    // Render per line: gutter label | plan lane | gap | act lane
+    let active_title: Option<String> = if matches!(app.view(), View::Today) {
+        app.day.active_index().and_then(|idx| app.day.tasks.get(idx)).map(|t| t.title.clone())
+    } else {
+        None
+    };
+    for i in 0..rect.height {
+        let y = rect.y + i;
+        let label = hour_labels[i as usize].clone().unwrap_or_default();
+        let mut left = format!("{label:>6}");
+        // ensure width
+        if left.len() < gutter as usize {
+            left = format!("{:>width$}", left, width = gutter as usize);
+        }
+        let is_now_row = {
+            let y_now = {
+                let rel = now_min.saturating_sub(start_min) as u32;
+                (rel * (rect.height.saturating_sub(1) as u32) / (span as u32)) as u16
+            };
+            i == y_now
+        };
+        let left_span = Span::styled(left, Style::default().fg(Color::DarkGray));
+        let plan_cell = if is_now_row {
+            // Show Now HH:MM at the head of the plan lane, then extend with line
+            let hh = (now_min / 60) % 24;
+            let mm = now_min % 60;
+            let label = format!("Now {:02}:{:02}", hh, mm);
+            let fitted = fit_to_width(&label, lane_w as usize);
+            use unicode_width::UnicodeWidthStr as UW;
+            let w = UW::width(fitted.as_str()) as u16;
+            let mut s = String::new();
+            s.push_str(&fitted);
+            if w < lane_w {
+                s.push_str(&"─".repeat((lane_w - w) as usize));
+            }
+            s
+        } else {
+            lines_plan[i as usize].clone()
+        };
+        let act_cell = if is_now_row {
+            if let Some(title) = active_title.as_ref() {
+                let fitted = fit_to_width(title, lane_w as usize);
+                use unicode_width::UnicodeWidthStr as UW;
+                let w = UW::width(fitted.as_str()) as u16;
+                let mut s = String::new();
+                s.push_str(&fitted);
+                if w < lane_w {
+                    s.push_str(&"─".repeat((lane_w - w) as usize));
+                }
+                s
+            } else {
+                "─".repeat(lane_w as usize)
+            }
+        } else {
+            lines_act[i as usize].clone()
+        };
+        let plan_span = Span::styled(
+            plan_cell,
+            if is_now_row {
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Green)
+            },
+        );
+        let gap_span = if is_now_row {
+            Span::styled("─", Style::default().fg(Color::Red))
+        } else {
+            Span::raw(" ")
+        };
+        let act_style = if is_now_row {
+            if active_title.is_some() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::Red)
+            }
+        } else {
+            Style::default().fg(Color::Magenta)
+        };
+        let act_span = Span::styled(act_cell, act_style);
+        let line = Line::from(vec![left_span, Span::raw(" "), plan_span, gap_span, act_span]);
+        let para = Paragraph::new(line);
+        f.render_widget(para, Rect { x: rect.x, y, width: rect.width, height: 1 });
+    }
 }
