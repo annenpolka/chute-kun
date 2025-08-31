@@ -1085,9 +1085,9 @@ pub fn command_popup_button_hitboxes(_app: &App, popup: Rect) -> (Rect, Rect) {
 fn date_label_for(ymd: u32) -> String {
     let base = if crate::date::is_valid_ymd(ymd) { ymd } else { crate::date::today_ymd() };
     let wd = crate::date::weekday_short_en(base);
-    if ymd == crate::date::today_ymd() {
+    if base == crate::date::today_ymd() {
         format!("Today ({})", wd)
-    } else if ymd == crate::date::add_days_to_ymd(crate::date::today_ymd(), 1) {
+    } else if base == crate::date::add_days_to_ymd(crate::date::today_ymd(), 1) {
         format!("Tomorrow ({})", wd)
     } else {
         format!("{} ({})", crate::date::format_ymd(base), wd)

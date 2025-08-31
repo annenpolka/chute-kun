@@ -902,6 +902,12 @@ impl App {
             A::EstimatePlus => {
                 // Repurpose to open estimate editor for backward compatibility with config name
                 if !self.day.tasks.is_empty() {
+                    // Backfill missing planned date so edit UI shows Today/Tomorrow correctly
+                    if let Some(t) = self.day.tasks.get_mut(self.selected) {
+                        if !crate::date::is_valid_ymd(t.planned_ymd) {
+                            t.planned_ymd = today_ymd();
+                        }
+                    }
                     self.input =
                         Some(Input { kind: InputKind::EstimateEdit, buffer: String::new() });
                 }
