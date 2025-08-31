@@ -10,7 +10,7 @@ repository = "https://github.com/annenpolka/chute-kun"
 homepage = "https://github.com/annenpolka/chute-kun"
 documentation = "https://docs.rs/chute_kun"
 readme = "README.md"
-keywords = ["tui", "cli", "taskchute", "time-tracking"]
+keywords = ["tui", "cli", "taskchute", "time-tracking", "time-management"]
 # Valid category slugs must come from https://crates.io/category_slugs
 categories = ["command-line-utilities", "date-and-time"]
 
