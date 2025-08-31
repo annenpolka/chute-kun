@@ -135,6 +135,16 @@ pub fn draw(f: &mut Frame, app: &App) {
         if help_area.height >= 1 {
             render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
         }
+        // Draw major tick labels on the line above the gauge when at least 2 lines tall
+        if help_area.height >= 2 {
+            let label_rect = Rect {
+                x: gauge_area.x,
+                y: gauge_area.y.saturating_sub(1),
+                width: gauge_area.width,
+                height: 1,
+            };
+            render_gauge_labels(f, label_rect);
+        }
     }
 
     // Overlay: centered estimate editor popup (date + slider + OK/Cancel)
@@ -565,6 +575,15 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         }
         if help_area.height >= 1 {
             render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
+        }
+        if help_area.height >= 2 {
+            let label_rect = Rect {
+                x: gauge_area.x,
+                y: gauge_area.y.saturating_sub(1),
+                width: gauge_area.width,
+                height: 1,
+            };
+            render_gauge_labels(f, label_rect);
         }
     }
 
@@ -1349,12 +1368,22 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
             cells[x] = Some(Color::DarkGray);
         }
     }
+    // Overlay thicker ticks at 6h, 12h, 18h (always visible)
+    for h in [6u16, 12u16, 18u16] {
+        let x = ((h as u32 * 60) * (rect.width as u32) / 1440) as usize;
+        if x < w {
+            glyphs[x] = '│';
+            cells[x] = Some(Color::DarkGray);
+        }
+    }
     // Overlay current time marker '^' in red, always on top
     let x_now = ((now_min as u32) * (rect.width as u32) / 1440) as usize;
     if x_now < w {
         glyphs[x_now] = '^';
         cells[x_now] = Some(Color::Red);
     }
+
+    // Render labels above the gauge if there is space handled by caller
     // Compress into styled spans (by (glyph, color))
     let mut spans: Vec<Span> = Vec::new();
     let mut i = 0usize;
@@ -1376,6 +1405,32 @@ fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
     }
     let line = Line::from(spans);
     let para = Paragraph::new(line);
+    f.render_widget(para, rect);
+}
+
+/// Render labels for major ticks (6, 12, 18) on the provided one-line rect.
+fn render_gauge_labels(f: &mut Frame, rect: Rect) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+    let w = rect.width as usize;
+    let mut line: Vec<char> = vec![' '; w];
+    let put = |line: &mut [char], x: usize, s: &str| {
+        for (i, ch) in s.chars().enumerate() {
+            if x + i < line.len() {
+                line[x + i] = ch;
+            }
+        }
+    };
+    let map_x = |m: u16, width: u16| -> usize { ((m as u32) * (width as u32) / 1440u32) as usize };
+    let x6 = map_x(6 * 60, rect.width);
+    let x12 = map_x(12 * 60, rect.width);
+    let x18 = map_x(18 * 60, rect.width);
+    put(&mut line, x6, "6");
+    put(&mut line, x12, "12");
+    put(&mut line, x18, "18");
+    let text: String = line.into_iter().collect();
+    let para = Paragraph::new(Span::styled(text, Style::default().fg(Color::DarkGray)));
     f.render_widget(para, rect);
 }
 
