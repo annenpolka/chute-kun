@@ -585,8 +585,14 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         }
         spans.push(state_icon_span(t.state));
         spans.push(Span::raw(" "));
-        spans.push(Span::raw(t.title.clone()));
-        spans.push(Span::raw(format!(" (est:{}m)", t.estimate_min)));
+        // Completed tasks: render title (and estimate suffix) with strikethrough for clarity
+        let title_style = if matches!(t.state, TaskState::Done) {
+            Style::default().add_modifier(Modifier::CROSSED_OUT)
+        } else {
+            Style::default()
+        };
+        spans.push(Span::styled(t.title.clone(), title_style));
+        spans.push(Span::styled(format!(" (est:{}m)", t.estimate_min), title_style));
         let title_cell = Cell::from(Line::from(spans));
         // New dedicated accumulated time column with seconds
         let secs = if matches!(t.state, TaskState::Active | TaskState::Paused) {
