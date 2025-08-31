@@ -14,6 +14,11 @@ use crate::task::TaskState;
 // the eye‑searing effect of bright Blue/Cyan backgrounds.
 pub const SELECTED_ROW_BG: Color = Color::Rgb(0, 60, 120); // dark blue
 pub const HOVER_ROW_BG: Color = Color::Rgb(0, 100, 100); // dark cyan/teal
+                                                         // Drag visuals
+pub const DRAG_SOURCE_BG_A: Color = Color::Rgb(100, 0, 120); // purple (pulse A)
+pub const DRAG_SOURCE_BG_B: Color = Color::Rgb(140, 0, 160); // brighter purple (pulse B)
+pub const DRAG_TARGET_BG_A: Color = Color::Rgb(0, 120, 60); // greenish (pulse A)
+pub const DRAG_TARGET_BG_B: Color = Color::Rgb(0, 160, 80); // brighter greenish (pulse B)
 
 const MIN_LIST_LINES: u16 = 3; // table header + at least two rows
 
@@ -545,6 +550,9 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
 
     let selected = app.selected_index().min(tasks_slice.len().saturating_sub(1));
     let hovered = app.hovered_index();
+    let dragging = app.is_dragging();
+    let drag_from = app.drag_source_index();
+    let pulse_on = app.pulse_on();
     for (i, t) in tasks_slice.iter().enumerate() {
         let hh = (starts[i] / 60) % 24;
         let mm = starts[i] % 60;
@@ -552,6 +560,17 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         let actual_cell = Cell::from(format_actual_last_finish_time(t));
         // Title cell with colored state icon and plain title/estimate
         let mut spans: Vec<Span> = Vec::new();
+        // Drag target indicator arrow before icon (only while dragging over this row)
+        if dragging && hovered == Some(i) {
+            let arrow = match drag_from {
+                Some(from) if from < i => "↓",
+                Some(from) if from > i => "↑",
+                _ => "•",
+            };
+            let arrow_style = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
+            spans.push(Span::styled(arrow.to_string(), arrow_style));
+            spans.push(Span::raw(" "));
+        }
         spans.push(state_icon_span(t.state));
         spans.push(Span::raw(" "));
         spans.push(Span::raw(t.title.clone()));
@@ -564,7 +583,17 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
             0
         };
         let act_cell = Cell::from(format!("{}m {}s", t.actual_min, secs));
-        let highlight_bg = if i == selected {
+        let highlight_bg = if dragging {
+            if Some(i) == drag_from {
+                Some(if pulse_on { DRAG_SOURCE_BG_B } else { DRAG_SOURCE_BG_A })
+            } else if hovered == Some(i) {
+                Some(if pulse_on { DRAG_TARGET_BG_B } else { DRAG_TARGET_BG_A })
+            } else if i == selected {
+                Some(SELECTED_ROW_BG)
+            } else {
+                None
+            }
+        } else if i == selected {
             Some(SELECTED_ROW_BG)
         } else if hovered == Some(i) {
             Some(HOVER_ROW_BG)
