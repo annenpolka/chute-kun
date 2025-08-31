@@ -10,7 +10,7 @@ fn set_day_start_updates_config_toml() {
     let path: PathBuf = dir.path().join("config.toml");
 
     // Run the binary with CHUTE_KUN_CONFIG pointing to a temp file and set day start
-    let mut cmd = Command::cargo_bin("chute_kun").unwrap();
+    let mut cmd = Command::cargo_bin("chute-kun").unwrap();
     cmd.env("CHUTE_KUN_CONFIG", &path);
     cmd.args(["--set-day-start", "10:30"]);
     cmd.assert().success();
@@ -28,7 +28,7 @@ fn set_day_start_rejects_invalid_format() {
     let dir = tempdir().unwrap();
     let path: PathBuf = dir.path().join("config.toml");
 
-    let mut cmd = Command::cargo_bin("chute_kun").unwrap();
+    let mut cmd = Command::cargo_bin("chute-kun").unwrap();
     cmd.env("CHUTE_KUN_CONFIG", &path);
     cmd.args(["--set-day-start", "25-99"]); // invalid format (missing colon)
     cmd.assert().failure();
@@ -39,7 +39,7 @@ fn set_day_start_accepts_compact_hhmm() {
     let dir = tempdir().unwrap();
     let path: PathBuf = dir.path().join("config.toml");
 
-    let mut cmd = Command::cargo_bin("chute_kun").unwrap();
+    let mut cmd = Command::cargo_bin("chute-kun").unwrap();
     cmd.env("CHUTE_KUN_CONFIG", &path);
     cmd.args(["--set-day-start", "1000"]);
     cmd.assert().success();
