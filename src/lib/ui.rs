@@ -101,15 +101,30 @@ pub fn draw(f: &mut Frame, app: &App) {
         }
     }
 
-    // Help block at the bottom (wrapped to fit width)
+    // Help block + 24h gauge at the very bottom line
     // When an active banner is present, help resides at the last chunk, not index 2.
     let help_idx = chunks.len().saturating_sub(1);
     if chunks[help_idx].height > 0 {
-        let help_text = help_lines.join("\n");
-        let help = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .wrap(Wrap { trim: true });
-        f.render_widget(help, chunks[help_idx]);
+        let help_area = chunks[help_idx];
+        // Reserve the last line for the 24h category gauge, render help text above it
+        let (help_text_area, gauge_area) = if help_area.height >= 1 {
+            let g = Rect { x: help_area.x, y: help_area.y + help_area.height - 1, width: help_area.width, height: 1 };
+            let h = Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: help_area.height.saturating_sub(1) };
+            (h, g)
+        } else {
+            (help_area, help_area)
+        };
+        if help_text_area.height > 0 {
+            let help_text = help_lines.join("\n");
+            let help = Paragraph::new(help_text)
+                .style(Style::default().fg(Color::DarkGray))
+                .wrap(Wrap { trim: true });
+            f.render_widget(help, help_text_area);
+        }
+        // Draw 24h gauge on the reserved last line
+        if help_area.height >= 1 {
+            render_bottom_24h_gauge(f, app, gauge_area, crate::clock::system_now_minutes());
+        }
     }
 
     // Overlay: centered estimate editor popup (date + slider + OK/Cancel)
@@ -510,14 +525,27 @@ pub fn draw_with_clock(f: &mut Frame, app: &App, clock: &dyn Clock) {
         }
     }
 
-    // Help block at the bottom (wrapped to fit width)
+    // Help block + 24h gauge at the bottom
     let help_idx = chunks.len().saturating_sub(1);
     if chunks[help_idx].height > 0 {
-        let help_text = help_lines.join("\n");
-        let help = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::DarkGray))
-            .wrap(Wrap { trim: true });
-        f.render_widget(help, chunks[help_idx]);
+        let help_area = chunks[help_idx];
+        let (help_text_area, gauge_area) = if help_area.height >= 1 {
+            let g = Rect { x: help_area.x, y: help_area.y + help_area.height - 1, width: help_area.width, height: 1 };
+            let h = Rect { x: help_area.x, y: help_area.y, width: help_area.width, height: help_area.height.saturating_sub(1) };
+            (h, g)
+        } else {
+            (help_area, help_area)
+        };
+        if help_text_area.height > 0 {
+            let help_text = help_lines.join("\n");
+            let help = Paragraph::new(help_text)
+                .style(Style::default().fg(Color::DarkGray))
+                .wrap(Wrap { trim: true });
+            f.render_widget(help, help_text_area);
+        }
+        if help_area.height >= 1 {
+            render_bottom_24h_gauge(f, app, gauge_area, clock.now_minutes());
+        }
     }
 
     // Overlay: centered delete confirmation popup with colored text
@@ -1253,6 +1281,61 @@ fn render_tabs_line(f: &mut Frame, rect: Rect, app: &App) {
             line.spans.push(Span::styled("│".to_string(), Style::default().fg(Color::DarkGray)));
         }
     }
+    let para = Paragraph::new(line);
+    f.render_widget(para, rect);
+}
+
+/// Render a one-line 24h horizontal gauge showing actual work sessions by category.
+/// - Range is fixed to 00:00..24:00 mapped across `rect.width` cells.
+/// - Colored segments reflect task categories; overlapping sessions pick the last seen.
+/// - Ongoing session uses `now_min` as its temporary end.
+fn render_bottom_24h_gauge(f: &mut Frame, app: &App, rect: Rect, now_min: u16) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+    let w = rect.width as usize;
+    // Prepare per-cell colors; default None means no work recorded
+    let mut cells: Vec<Option<Color>> = vec![None; w];
+    // Gather all actual sessions for the current view's tasks
+    let tasks_slice: Vec<crate::task::Task> = match app.view() {
+        View::Past => app.history_tasks().clone(),
+        View::Today => app.day.tasks.clone(),
+        View::Future => app.tomorrow_tasks().clone(),
+    };
+    for t in tasks_slice.iter() {
+        let cat_color = app.config.category_color(t.category);
+        for s in t.sessions.iter() {
+            let s_min = s.start_min.min(23 * 60 + 59);
+            let e_min = s.end_min.unwrap_or(now_min).min(23 * 60 + 59);
+            if e_min < s_min {
+                continue;
+            }
+            let x0 = ((s_min as u32) * (rect.width as u32) / 1440) as usize;
+            let x1 = ((e_min as u32) * (rect.width as u32) / 1440) as usize;
+            let x0 = x0.min(w.saturating_sub(1));
+            let x1 = x1.min(w.saturating_sub(1)).max(x0);
+            for x in x0..=x1 {
+                cells[x] = Some(cat_color);
+            }
+        }
+    }
+    // Compress into styled spans
+    let mut spans: Vec<Span> = Vec::new();
+    let mut i = 0usize;
+    while i < w {
+        let color = cells[i];
+        let j = ((i + 1)..=w).find(|&k| k == w || cells[k] != color).unwrap_or(w);
+        let len = j - i;
+        let sym = if color.is_some() { "█" } else { "·" };
+        let text = sym.repeat(len);
+        let style = match color {
+            Some(c) => Style::default().fg(c).add_modifier(Modifier::BOLD),
+            None => Style::default().fg(Color::DarkGray),
+        };
+        spans.push(Span::styled(text, style));
+        i = j;
+    }
+    let line = Line::from(spans);
     let para = Paragraph::new(line);
     f.render_widget(para, rect);
 }
