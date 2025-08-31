@@ -357,6 +357,32 @@ pub fn draw(f: &mut Frame, app: &App) {
         let btn_rect = Rect { x: inner_popup.x, y: btn_y, width: inner_popup.width, height: 1 };
         f.render_widget(btn_line, btn_rect);
     }
+
+    // Overlay: category picker
+    if let Some(popup) = compute_category_popup_rect(app, area) {
+        // Title
+        let header_line = header_title_line(app_display_base(app), app);
+        let block = Block::default().title(header_line).borders(Borders::ALL);
+        f.render_widget(block, area);
+        // Inner box for list
+        let inner = Rect { x: popup.x, y: popup.y, width: popup.width, height: popup.height };
+        let mut rows: Vec<Row> = Vec::new();
+        let options = category_options();
+        for (i, (label, color, _cat)) in options.iter().enumerate() {
+            let bullet = Span::styled("●".to_string(), Style::default().fg(*color));
+            let text = Span::styled((*label).to_string(), Style::default().fg(*color).add_modifier(Modifier::BOLD));
+            let line = Line::from(vec![bullet, Span::raw(" "), text]);
+            let mut row = Row::new(vec![Cell::from(line)]);
+            if app.category_pick_index() == i {
+                row = row.style(Style::default().bg(Color::Blue));
+            }
+            rows.push(row);
+        }
+        let table = Table::new(rows, [Constraint::Min(10)])
+            .header(Row::new(vec![Cell::from("Category")]).style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)))
+            .block(Block::default().borders(Borders::ALL).title("Select Category (Enter)"));
+        f.render_widget(table, inner);
+    }
 }
 
 /// Like `draw`, but uses an injected `Clock` for current time.
@@ -601,12 +627,23 @@ fn build_task_table(now_min: u16, app: &App, tasks_slice: &[crate::task::Task]) 
         }
         spans.push(state_icon_span(t.state));
         spans.push(Span::raw(" "));
-        // Completed tasks: render title with strikethrough for clarity
-        let title_style = if matches!(t.state, TaskState::Done) {
+        // Category colored dot
+        let cat_color = match t.category {
+            crate::task::Category::General => Color::White,
+            crate::task::Category::Work => Color::Blue,
+            crate::task::Category::Home => Color::Yellow,
+            crate::task::Category::Hobby => Color::Magenta,
+        };
+        spans.push(Span::styled("●".to_string(), Style::default().fg(cat_color)));
+        spans.push(Span::raw(" "));
+        // Title color: by category; Done overrides to gray. Keep strikethrough for Done.
+        let title_fg = if matches!(t.state, TaskState::Done) { Color::DarkGray } else { cat_color };
+        let mut title_style = if matches!(t.state, TaskState::Done) {
             Style::default().add_modifier(Modifier::CROSSED_OUT)
         } else {
             Style::default()
         };
+        title_style = title_style.fg(title_fg);
         spans.push(Span::styled(t.title.clone(), title_style));
         let title_cell = Cell::from(Line::from(spans));
         // New dedicated estimate column
@@ -737,6 +774,37 @@ pub fn header_title_line(now_min: u16, app: &App) -> Line<'static> {
     line.spans.push(val(format!("{}m {}s", act_m, act_s), Color::Magenta));
 
     line
+}
+
+// ---- Category picker UI helpers ----
+
+pub fn category_options() -> Vec<(&'static str, Color, crate::task::Category)> {
+    vec![
+        ("General", Color::White, crate::task::Category::General),
+        ("Work", Color::Blue, crate::task::Category::Work),
+        ("Home", Color::Yellow, crate::task::Category::Home),
+        ("Hobby", Color::Magenta, crate::task::Category::Hobby),
+    ]
+}
+
+pub fn compute_category_popup_rect(app: &App, area: Rect) -> Option<Rect> {
+    if !app.is_category_picker() {
+        return None;
+    }
+    let width: u16 = 24;
+    let height: u16 = 1 /* header */ + category_options().len() as u16 + 2; // box padding
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    Some(Rect { x, y, width, height })
+}
+
+pub fn category_picker_hitboxes(_app: &App, popup: Rect) -> Vec<Rect> {
+    let list_y = popup.y + 2; // leave a small margin
+    let mut rects = Vec::new();
+    for i in 0..category_options().len() as u16 {
+        rects.push(Rect { x: popup.x + 1, y: list_y + i, width: popup.width.saturating_sub(2), height: 1 });
+    }
+    rects
 }
 
 /// Right-aligned action buttons for the title bar: New | Start | Stop | Finish | Delete.
@@ -934,6 +1002,10 @@ pub fn help_items_for(app: &App) -> Vec<String> {
             items.push(format!("{}: edit", join(&km.estimate_plus)));
             // Toggle display mode (List <-> Calendar)
             items.push(format!("{}: calendar", join(&km.toggle_blocks)));
+            // Category cycle (configurable)
+            items.push(format!("{}: category", join(&km.category_cycle)));
+            // Category picker open (configurable)
+            items.push(format!("{}: picker", join(&km.category_picker)));
             // Compact vim-like navigation chars as trailing hint (if present)
             let up_chars: Vec<char> = km
                 .select_up
