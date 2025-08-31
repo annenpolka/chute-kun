@@ -15,4 +15,3 @@ category_cycle = "z"
     assert!(s.contains("z: category"), "expected custom category key in help, got: {}", s);
     assert!(!s.contains("c: category"), "should not show default when overridden: {}", s);
 }
-

@@ -22,7 +22,12 @@ fn right_click_dot_opens_picker_and_enter_applies() {
 
     // Open picker via right click on the dot
     app.handle_mouse_event(
-        MouseEvent { kind: MouseEventKind::Down(MouseButton::Right), column: dot_x, row: row_y, modifiers: crossterm::event::KeyModifiers::empty() },
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Right),
+            column: dot_x,
+            row: row_y,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        },
         area,
     );
     assert!(app.is_category_picker(), "expected category picker to be open");

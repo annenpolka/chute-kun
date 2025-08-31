@@ -6,12 +6,7 @@ fn cell_at(buf: &ratatui::buffer::Buffer, x: u16, y: u16) -> &ratatui::buffer::C
     &buf[(x, y)]
 }
 
-fn find_char_x_in_row(
-    buf: &ratatui::buffer::Buffer,
-    rect: Rect,
-    y: u16,
-    ch: char,
-) -> Option<u16> {
+fn find_char_x_in_row(buf: &ratatui::buffer::Buffer, rect: Rect, y: u16, ch: char) -> Option<u16> {
     let y = y.min(rect.y + rect.height.saturating_sub(1));
     (rect.x..rect.x + rect.width).find(|&x| buf[(x, y)].symbol() == ch.to_string())
 }
@@ -58,4 +53,3 @@ fn title_is_colored_by_category_and_done_is_gray() {
     let xc = xc_dot + 2;
     assert_eq!(cell_at(&buf, xc, row_c_y).style().fg, Some(Color::DarkGray)); // Done overrides -> Gray
 }
-

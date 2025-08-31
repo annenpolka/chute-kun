@@ -6,12 +6,7 @@ fn cell_at(buf: &ratatui::buffer::Buffer, x: u16, y: u16) -> &ratatui::buffer::C
     &buf[(x, y)]
 }
 
-fn find_char_x_in_row(
-    buf: &ratatui::buffer::Buffer,
-    rect: Rect,
-    y: u16,
-    ch: char,
-) -> Option<u16> {
+fn find_char_x_in_row(buf: &ratatui::buffer::Buffer, rect: Rect, y: u16, ch: char) -> Option<u16> {
     let y = y.min(rect.y + rect.height.saturating_sub(1));
     (rect.x..rect.x + rect.width).find(|&x| buf[(x, y)].symbol() == ch.to_string())
 }
@@ -88,4 +83,3 @@ fn pressing_c_cycles_category_colors() {
     let x3 = find_char_x_in_row(&buf, list, y, '●').expect("dot not found after 3rd cycle");
     assert_eq!(cell_at(&buf, x3, y).style().fg, Some(Color::Magenta));
 }
-

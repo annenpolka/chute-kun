@@ -7,4 +7,3 @@ fn today_help_includes_category_hint() {
     let s = format_help_line_for(&app);
     assert!(s.contains("c: category"), "help should include 'c: category', got: {}", s);
 }
-

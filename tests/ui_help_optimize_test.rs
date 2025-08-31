@@ -10,8 +10,8 @@ fn today_help_includes_task_actions() {
     assert!(s.contains("Enter"));
     assert!(s.contains("Shift+Enter"));
     assert!(s.contains("start/pause"));
-    // Interrupt key is dynamic; default is "I" (capital i)
-    assert!(s.contains("I: interrupt"));
+    // Interrupt key follows config; default is Shift+i
+    assert!(s.contains("Shift+i: interrupt"));
     assert!(s.contains("e: edit"));
     assert!(s.contains("j/k"));
     assert!(s.contains("p: postpone"));

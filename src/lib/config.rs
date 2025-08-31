@@ -66,7 +66,7 @@ impl Default for KeyMap {
             select_down: vec![k("Down"), k("j")],
             toggle_blocks: vec![k("t")],
             category_cycle: vec![k("c")],
-            category_picker: vec![k("C")],
+            category_picker: vec![k("Shift+c")],
         }
     }
 }
@@ -175,12 +175,21 @@ impl KeySpec {
             s if s.len() == 1 => KeyCode::Char(s.chars().next().unwrap()),
             other => return Err(anyhow!("unsupported key: {}", other)),
         };
-        // Normalize Ctrl+letter to lowercase to be case-insensitive in configs
-        if mods.contains(KeyModifiers::CONTROL) {
-            if let KeyCode::Char(c) = code {
-                if c.is_ascii_alphabetic() {
-                    code = KeyCode::Char(c.to_ascii_lowercase());
-                }
+        // Normalize semantics:
+        // - Uppercase single letters mean Shift+lowercase (e.g., "C" -> Shift+"c").
+        // - Ctrl+letter is case-insensitive; compare on lowercase.
+        if let KeyCode::Char(c) = code {
+            let is_alpha = c.is_ascii_alphabetic();
+            let is_upper = c.is_ascii_uppercase();
+            let has_ctrl = mods.contains(KeyModifiers::CONTROL);
+            if is_alpha && is_upper && !has_ctrl {
+                // Interpret bare uppercase as Shift+lowercase (but not when Ctrl is present)
+                mods |= KeyModifiers::SHIFT;
+                code = KeyCode::Char(c.to_ascii_lowercase());
+            }
+            if has_ctrl && is_alpha {
+                // Ctrl+letter is matched case-insensitively on lowercase
+                code = KeyCode::Char(c.to_ascii_lowercase());
             }
         }
         Ok(KeySpec { code, modifiers: mods })
@@ -189,8 +198,35 @@ impl KeySpec {
     pub fn matches(&self, ev: &KeyEvent) -> bool {
         use KeyCode::*;
         // Treat Shift+Tab and BackTab as equivalent across terminals
-        let (sc, sm) = (self.code, self.modifiers);
-        let (ec, em) = (ev.code, ev.modifiers);
+        let (mut sc, mut sm) = (self.code, self.modifiers);
+        let (mut ec, mut em) = (ev.code, ev.modifiers);
+        // Normalize letters:
+        // - Uppercase chars imply Shift+lowercase for matching (some terminals send 'C' with/without SHIFT).
+        // - Ctrl+letter is matched case-insensitively on lowercase.
+        if let KeyCode::Char(c) = sc {
+            let is_alpha = c.is_ascii_alphabetic();
+            let is_upper = c.is_ascii_uppercase();
+            let has_ctrl = sm.contains(KeyModifiers::CONTROL);
+            if is_alpha && is_upper && !has_ctrl {
+                sc = KeyCode::Char(c.to_ascii_lowercase());
+                sm |= KeyModifiers::SHIFT;
+            }
+            if has_ctrl && is_alpha {
+                sc = KeyCode::Char(c.to_ascii_lowercase());
+            }
+        }
+        if let KeyCode::Char(c) = ec {
+            let is_alpha = c.is_ascii_alphabetic();
+            let is_upper = c.is_ascii_uppercase();
+            let has_ctrl = em.contains(KeyModifiers::CONTROL);
+            if is_alpha && is_upper && !has_ctrl {
+                ec = KeyCode::Char(c.to_ascii_lowercase());
+                em |= KeyModifiers::SHIFT;
+            }
+            if has_ctrl && is_alpha {
+                ec = KeyCode::Char(c.to_ascii_lowercase());
+            }
+        }
         let self_is_shift_tab = (sc == Tab && sm.contains(KeyModifiers::SHIFT)) || sc == BackTab;
         let ev_is_shift_tab = (ec == Tab && em.contains(KeyModifiers::SHIFT)) || ec == BackTab;
         if self_is_shift_tab && ev_is_shift_tab {
@@ -416,7 +452,7 @@ day_start = "09:00"
 # 既定のキーバインド。必要なものだけ上書きできます。
 quit = "q"
 add_task = "i"
-add_interrupt = "I"
+add_interrupt = "Shift+i"
 start_or_resume = "Enter"
 finish_active = ["Shift+Enter", "f"]
 pause = "Space"
@@ -432,7 +468,7 @@ select_up = ["Up", "k"]
 select_down = ["Down", "j"]
 toggle_blocks = "t"
 category_cycle = "c"
-category_picker = "C"
+category_picker = "Shift+c"
 "#.to_string()
     }
 
