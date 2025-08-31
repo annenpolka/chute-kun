@@ -1,5 +1,5 @@
 [package]
-name = "chute_kun"
+name = "chute-kun"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
@@ -11,7 +11,7 @@ description = "TaskChute + Todoist CLI/TUI — Rust TUI template using ratatui +
 # e.g., https://github.com/<owner>/chute_kun
 repository = "https://github.com/annenpolka/chute-kun"
 homepage = "https://github.com/annenpolka/chute-kun"
-documentation = "https://docs.rs/chute_kun"
+documentation = "https://docs.rs/chute-kun"
 readme = "README.md"
 keywords = ["tui", "cli", "taskchute", "time-tracking", "time-management"]
 # Valid category slugs must come from https://crates.io/category_slugs

@@ -54,6 +54,12 @@ TUI から変更（永続化）:
 
 生成場所やキー設定の詳細は `docs/setup/configuration.md` を参照。
 
+インストール（crates.io 公開後）:
+
+```
+cargo install chute-kun
+```
+
 ### 表示モード切替（List ↔ Calendar）
 
 `t` キーで一覧表（List）とカレンダービュー（Calendar）の表示を切り替えられます。Calendar では、左の時刻軸に沿って Plan/Actual の縦レーンを描画し、Plan 側の各ブロックにタスク名を表示します。
